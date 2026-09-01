@@ -1,3 +1,5 @@
+import { clearToken, getToken } from "./auth";
+
 export interface User {
   id: string | number;
   name: string;
@@ -9,14 +11,65 @@ export interface NewUser {
   email: string;
 }
 
+export interface AuthResponse {
+  token: string;
+  userId: number;
+  name: string;
+  email: string;
+}
+
 const API_URL = import.meta.env.VITE_API_URL;
 
 if (!API_URL) {
   throw new Error("VITE_API_URL is not set. Add it to your .env file.");
 }
 
+async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
+  const token = getToken();
+  const headers = new Headers(options.headers);
+  headers.set("Content-Type", "application/json");
+  if (token) {
+    headers.set("Authorization", `Bearer ${token}`);
+  }
+
+  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+
+  if (res.status === 401) {
+    clearToken();
+    if (!window.location.pathname.startsWith("/login")) {
+      window.location.href = "/login";
+    }
+  }
+
+  return res;
+}
+
+export async function register(name: string, email: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_URL}/api/auth/register`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name, email, password }),
+  });
+  if (!res.ok) {
+    throw new Error(await res.text() || `Registration failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function login(email: string, password: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_URL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) {
+    throw new Error(await res.text() || `Login failed (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function getUsers(): Promise<User[]> {
-  const res = await fetch(`${API_URL}/api/users`);
+  const res = await apiFetch("/api/users");
   if (!res.ok) {
     throw new Error(`Failed to fetch users (${res.status})`);
   }
@@ -24,9 +77,8 @@ export async function getUsers(): Promise<User[]> {
 }
 
 export async function createUser(user: NewUser): Promise<User> {
-  const res = await fetch(`${API_URL}/api/users`, {
+  const res = await apiFetch("/api/users", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(user),
   });
   if (!res.ok) {
