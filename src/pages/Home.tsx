@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getVerseOfTheDay, type VerseOfTheDay } from "../api";
-import { AnnouncementCarousel, AppShell, IconButton, NavTile, VerseCard } from "../components/ui";
+import { AnnouncementCarousel, AppShell, NavTile, ProfileMenu, VerseCard } from "../components/ui";
 import { getBibleVersionId } from "../preferences";
 import {
   AnnouncementsIcon,
   DevotionIcon,
   HomeIcon,
-  ProfileIcon,
   ReportsIcon,
   SettingsIcon,
   UserListIcon,
@@ -41,13 +40,7 @@ function Home() {
   const comingSoon = (name: string) => () => window.alert(`${name} — coming soon`);
 
   return (
-    <AppShell
-      headerRight={
-        <IconButton aria-label="Profile">
-          <ProfileIcon />
-        </IconButton>
-      }
-    >
+    <AppShell headerRight={<ProfileMenu />}>
       <div className="home">
         <h1 className="welcome">Welcome back!</h1>
 

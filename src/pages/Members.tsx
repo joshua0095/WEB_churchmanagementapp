@@ -1,8 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
 import { createUser, getUsers, type User } from "../api";
-import { clearToken } from "../auth";
-import { AppShell, Button, Card, ListRow, TextField } from "../components/ui";
+import { AppShell, Button, Card, ListRow, ProfileMenu, TextField } from "../components/ui";
 
 function Members() {
   const [users, setUsers] = useState<User[]>([]);
@@ -13,8 +11,6 @@ function Members() {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
-
-  const navigate = useNavigate();
 
   const loadUsers = async () => {
     setLoading(true);
@@ -48,19 +44,8 @@ function Members() {
     }
   };
 
-  const handleLogout = () => {
-    clearToken();
-    navigate("/login", { replace: true });
-  };
-
   return (
-    <AppShell
-      headerRight={
-        <Button variant="secondary" type="button" onClick={handleLogout}>
-          Log out
-        </Button>
-      }
-    >
+    <AppShell headerRight={<ProfileMenu />}>
       <div className="page-header">
         <h1>Church Members</h1>
       </div>

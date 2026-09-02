@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { AppShell, ListRow } from "../components/ui";
+import { AppShell, ListRow, ProfileMenu } from "../components/ui";
 import { SearchIcon, TrashIcon } from "../components/ui/icons";
 
 interface Devo {
@@ -46,7 +46,7 @@ function Devotion() {
   };
 
   return (
-    <AppShell headerRight={<span className="avatar">U</span>}>
+    <AppShell headerRight={<ProfileMenu />}>
       <div className="devo-page">
         <div className="devo-header">
           <h1>Add Your Devo For Today</h1>
