@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { createUser, getUsers, type User } from "../api";
 import { clearToken } from "../auth";
+import { AppHeader, Button, Card, TextField } from "../components/ui";
 
 function Members() {
   const [users, setUsers] = useState<User[]>([]);
@@ -53,58 +54,66 @@ function Members() {
   };
 
   return (
-    <div className="page">
-      <div className="page-header">
-        <h1>Church Members</h1>
-        <button type="button" onClick={handleLogout}>
-          Log out
-        </button>
+    <>
+      <AppHeader
+        title="Jesus Is Lord Church"
+        actions={
+          <Button variant="secondary" type="button" onClick={handleLogout}>
+            Log out
+          </Button>
+        }
+      />
+      <div className="page">
+        <div className="page-header">
+          <h1>Church Members</h1>
+        </div>
+
+        <div className="page-sections">
+          <Card>
+            <h2 className="section-title">Add a member</h2>
+            <form onSubmit={handleSubmit} className="user-form">
+              <TextField
+                label="Name"
+                type="text"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                required
+              />
+              <TextField
+                label="Email"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+              <Button type="submit" disabled={submitting}>
+                {submitting ? "Adding..." : "Add Member"}
+              </Button>
+              {formError && <p className="error">{formError}</p>}
+            </form>
+          </Card>
+
+          <Card>
+            <h2 className="section-title">Members</h2>
+            {loading && <p className="helper-text">Loading...</p>}
+            {error && <p className="error">{error}</p>}
+            {!loading && !error && users.length === 0 && (
+              <p className="helper-text">No members yet.</p>
+            )}
+            {!loading && !error && users.length > 0 && (
+              <ul className="user-list">
+                {users.map((user) => (
+                  <li key={user.id}>
+                    <strong>{user.name}</strong>
+                    <span className="user-email">{user.email}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Card>
+        </div>
       </div>
-
-      <section className="card">
-        <h2>Add a member</h2>
-        <form onSubmit={handleSubmit} className="user-form">
-          <label>
-            Name
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </label>
-          <button type="submit" disabled={submitting}>
-            {submitting ? "Adding..." : "Add member"}
-          </button>
-          {formError && <p className="error">{formError}</p>}
-        </form>
-      </section>
-
-      <section className="card">
-        <h2>Members</h2>
-        {loading && <p>Loading...</p>}
-        {error && <p className="error">{error}</p>}
-        {!loading && !error && users.length === 0 && <p>No members yet.</p>}
-        {!loading && !error && users.length > 0 && (
-          <ul className="user-list">
-            {users.map((user) => (
-              <li key={user.id}>
-                <strong>{user.name}</strong> — {user.email}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-    </div>
+    </>
   );
 }
 

@@ -1,8 +1,7 @@
 .page {
-  max-width: 640px;
+  max-width: 720px;
   margin: 0 auto;
-  padding: 2rem 1rem;
-  text-align: left;
+  padding: 2rem 1.25rem 3rem;
 }
 
 .page-header {
@@ -10,41 +9,30 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  margin-bottom: 1.5rem;
 }
 
-.card {
-  background: #f9f9f9;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  padding: 1.5rem;
-  margin-bottom: 1.5rem;
+.page-header h1 {
+  font-size: 1.4rem;
+}
+
+.page-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.section-title {
+  font-size: 1rem;
+  font-weight: 800;
+  margin: 0 0 1rem;
+  color: var(--color-text-primary);
 }
 
 .user-form {
   display: flex;
   flex-direction: column;
-  gap: 0.75rem;
-}
-
-.user-form label {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-  font-size: 0.9rem;
-  font-weight: 600;
-}
-
-.user-form input {
-  padding: 0.5rem;
-  font-size: 1rem;
-  border: 1px solid #ccc;
-  border-radius: 4px;
-}
-
-.user-form button {
-  align-self: flex-start;
-  padding: 0.5rem 1.25rem;
-  cursor: pointer;
+  gap: 0.9rem;
 }
 
 .user-list {
@@ -53,14 +41,34 @@
   margin: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.6rem;
 }
 
 .user-list li {
-  padding: 0.5rem;
-  border-bottom: 1px solid #e0e0e0;
+  background: var(--color-navy);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  font-size: 0.9rem;
+}
+
+.user-list .user-email {
+  color: #c9d6e5;
+  font-weight: 400;
 }
 
 .error {
-  color: #c0392b;
+  color: var(--color-danger);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.helper-text {
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  margin: 0;
 }

@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../api";
 import { setToken } from "../auth";
+import { AuthLayout, Button, TextField } from "../components/ui";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -26,38 +27,35 @@ function Login() {
   };
 
   return (
-    <div className="page">
-      <h1>Log in</h1>
-      <section className="card">
-        <form onSubmit={handleSubmit} className="user-form">
-          <label>
-            Email
-            <input
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
-          </label>
-          <label>
-            Password
-            <input
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              required
-            />
-          </label>
-          <button type="submit" disabled={submitting}>
-            {submitting ? "Logging in..." : "Log in"}
-          </button>
-          {error && <p className="error">{error}</p>}
-        </form>
-        <p>
-          Don't have an account? <Link to="/signup">Sign up</Link>
-        </p>
-      </section>
-    </div>
+    <AuthLayout
+      title="Log In"
+      footer={
+        <>
+          Need an account? <Link to="/signup">Sign up here</Link>
+        </>
+      }
+    >
+      <form onSubmit={handleSubmit} className="auth-form">
+        <TextField
+          label="Email"
+          type="email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+        />
+        <TextField
+          label="Password"
+          type="password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+        />
+        <Button type="submit" disabled={submitting}>
+          {submitting ? "Logging in..." : "Log In"}
+        </Button>
+        {error && <p className="auth-error">{error}</p>}
+      </form>
+    </AuthLayout>
   );
 }
 

@@ -1,0 +1,44 @@
+/* Jesus Is Lord Church — design tokens (see src/assets/color-palette.md) */
+
+@font-face {
+  font-family: "Garamond Display";
+  src: url("./assets/Adobe Garamond Pro Bold.ttf") format("truetype");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Brand */
+  --color-navy: #0b1c33;
+  --color-navy-mid: #16305a;
+  --color-gold: #f2b705;
+  --color-gold-hover: #d9a604;
+
+  /* Surfaces */
+  --color-bg: #fafaf7;
+  --color-surface: #ffffff;
+  --color-border: #e7e9ec;
+
+  /* Text */
+  --color-text-primary: #0b1c33;
+  --color-text-secondary: #4a5568;
+  --color-text-on-navy: #ffffff;
+  --color-text-on-gold: #0b1c33;
+
+  /* Accent / state */
+  --color-info: #3b82c4;
+  --color-danger: #b5342a;
+  --color-success: #2f855a;
+
+  /* Typography */
+  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Garamond Display", Georgia, "Times New Roman", serif;
+
+  /* Shape / elevation */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --shadow-card: 0 4px 12px rgba(11, 28, 51, 0.06);
+  --shadow-pop: 0 12px 30px rgba(0, 0, 0, 0.25);
+}
