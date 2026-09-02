@@ -1,7 +1,6 @@
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { AppHeader, IconButton, ListRow } from "../components/ui";
-import { BackIcon, SearchIcon, TrashIcon } from "../components/ui/icons";
+import { AppShell, ListRow } from "../components/ui";
+import { SearchIcon, TrashIcon } from "../components/ui/icons";
 
 interface Devo {
   id: number;
@@ -22,7 +21,6 @@ function makeSampleDevos(): Devo[] {
 function Devotion() {
   const [devos, setDevos] = useState<Devo[]>(makeSampleDevos);
   const [query, setQuery] = useState("");
-  const navigate = useNavigate();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -48,17 +46,8 @@ function Devotion() {
   };
 
   return (
-    <>
-      <AppHeader
-        left={
-          <IconButton aria-label="Back to home" onClick={() => navigate("/")}>
-            <BackIcon />
-          </IconButton>
-        }
-        right={<span className="avatar">U</span>}
-      />
-
-      <div className="page">
+    <AppShell headerRight={<span className="avatar">U</span>}>
+      <div className="devo-page">
         <div className="devo-header">
           <h1>Add Your Devo For Today</h1>
           <button type="button" className="add-btn" onClick={handleAdd} aria-label="Add devotion">
@@ -93,7 +82,7 @@ function Devotion() {
           </ul>
         )}
       </div>
-    </>
+    </AppShell>
   );
 }
 

@@ -1,13 +1,12 @@
 export { default as Logo } from "./Logo";
 export { default as Button } from "./Button";
 export { default as TextField } from "./TextField";
+export { default as SelectField } from "./SelectField";
 export { default as Card } from "./Card";
 export { default as AuthLayout } from "./AuthLayout";
-export { default as AppHeader } from "./AppHeader";
+export { default as AppShell } from "./AppShell";
 export { default as IconButton } from "./IconButton";
 export { default as NavTile } from "./NavTile";
-export { default as SlideMenu } from "./SlideMenu";
-export type { SlideMenuItem } from "./SlideMenu";
 export { default as AnnouncementCarousel } from "./AnnouncementCarousel";
 export type { AnnouncementItem } from "./AnnouncementCarousel";
 export { default as VerseCard } from "./VerseCard";

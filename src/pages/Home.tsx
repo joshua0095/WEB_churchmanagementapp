@@ -1,19 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import {
-  AnnouncementCarousel,
-  AppHeader,
-  IconButton,
-  NavTile,
-  SlideMenu,
-  VerseCard,
-  type SlideMenuItem,
-} from "../components/ui";
+import { getVerseOfTheDay, type VerseOfTheDay } from "../api";
+import { AnnouncementCarousel, AppShell, IconButton, NavTile, VerseCard } from "../components/ui";
+import { getBibleVersionId } from "../preferences";
 import {
   AnnouncementsIcon,
   DevotionIcon,
   HomeIcon,
-  MenuIcon,
   ProfileIcon,
   ReportsIcon,
   SettingsIcon,
@@ -34,64 +27,63 @@ const ANNOUNCEMENTS = [
 ];
 
 function Home() {
-  const [menuOpen, setMenuOpen] = useState(false);
   const navigate = useNavigate();
+
+  const [verse, setVerse] = useState<VerseOfTheDay | null>(null);
+  const [verseError, setVerseError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getVerseOfTheDay(getBibleVersionId())
+      .then(setVerse)
+      .catch((err) => setVerseError(err instanceof Error ? err.message : "Failed to load verse"));
+  }, []);
 
   const comingSoon = (name: string) => () => window.alert(`${name} — coming soon`);
 
-  const menuItems: SlideMenuItem[] = [
-    { label: "Home", onClick: () => navigate("/") },
-    { label: "Devotion", onClick: () => navigate("/devotion") },
-    { label: "Reports", onClick: comingSoon("Reports") },
-    { label: "Announcements", onClick: comingSoon("Announcements") },
-    { label: "User List", onClick: () => navigate("/members") },
-    { label: "Settings", onClick: comingSoon("Settings") },
-  ];
-
   return (
-    <>
-      <AppHeader
-        left={
-          <IconButton aria-label="Open menu" onClick={() => setMenuOpen(true)}>
-            <MenuIcon />
-          </IconButton>
-        }
-        right={
-          <IconButton aria-label="Profile">
-            <ProfileIcon />
-          </IconButton>
-        }
-      />
-
-      <div className="page">
+    <AppShell
+      headerRight={
+        <IconButton aria-label="Profile">
+          <ProfileIcon />
+        </IconButton>
+      }
+    >
+      <div className="home">
         <h1 className="welcome">Welcome back!</h1>
 
-        <h2 className="section-title">Announcements</h2>
-        <AnnouncementCarousel items={ANNOUNCEMENTS} />
+        <div className="home-highlights">
+          <section>
+            <h2 className="section-title">Announcements</h2>
+            <AnnouncementCarousel items={ANNOUNCEMENTS} />
+          </section>
 
-        <h2 className="section-title">Verse of the Day</h2>
-        <VerseCard
-          reference="Philippians 3:17"
-          text="Join with others in following my example, brothers, and take note of those who live according to the pattern we gave you."
-        />
-
-        <h2 className="section-title">Menu</h2>
-        <div className="nav-grid">
-          <NavTile icon={<HomeIcon />} label="Home" onClick={() => navigate("/")} />
-          <NavTile icon={<DevotionIcon />} label="Devotion" onClick={() => navigate("/devotion")} />
-          <NavTile icon={<ReportsIcon />} label="Reports" onClick={comingSoon("Reports")} />
-          <NavTile
-            icon={<AnnouncementsIcon />}
-            label="Announcements"
-            onClick={comingSoon("Announcements")}
-          />
-          <NavTile icon={<UserListIcon />} label="User List" onClick={() => navigate("/members")} />
-          <NavTile icon={<SettingsIcon />} label="Settings" onClick={comingSoon("Settings")} />
+          <section>
+            <h2 className="section-title">Verse of the Day</h2>
+            {verse ? (
+              <VerseCard reference={verse.reference} text={verse.text} />
+            ) : (
+              <p className="helper-text">{verseError ?? "Loading verse..."}</p>
+            )}
+          </section>
         </div>
-      </div>
 
-      <SlideMenu open={menuOpen} onClose={() => setMenuOpen(false)} items={menuItems} />
-    </>
+        <section>
+          <h2 className="section-title">Quick Links</h2>
+          <div className="nav-grid">
+            <NavTile icon={<HomeIcon />} label="Home" onClick={() => navigate("/")} />
+            <NavTile icon={<DevotionIcon />} label="Devotion" onClick={() => navigate("/devotion")} />
+            <NavTile icon={<ReportsIcon />} label="Reports" onClick={comingSoon("Reports")} />
+            <NavTile
+              icon={<AnnouncementsIcon />}
+              label="Announcements"
+              onClick={comingSoon("Announcements")}
+            />
+            <NavTile icon={<UserListIcon />} label="User List" onClick={() => navigate("/members")} />
+            <NavTile icon={<SettingsIcon />} label="Settings" onClick={() => navigate("/settings")} />
+          </div>
+        </section>
+      </div>
+    </AppShell>
   );
 }
 

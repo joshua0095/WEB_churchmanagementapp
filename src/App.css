@@ -1,7 +1,14 @@
 .page {
-  max-width: 720px;
+  max-width: 1040px;
+  width: 100%;
   margin: 0 auto;
   padding: 2rem 1.25rem 3rem;
+}
+
+@media (min-width: 900px) {
+  .page {
+    padding: 2.5rem 2rem 3rem;
+  }
 }
 
 .page-header {
@@ -20,6 +27,13 @@
   display: flex;
   flex-direction: column;
   gap: 1.5rem;
+}
+@media (min-width: 900px) {
+  .page-sections {
+    display: grid;
+    grid-template-columns: minmax(280px, 380px) 1fr;
+    align-items: start;
+  }
 }
 
 .section-title {
@@ -48,19 +62,37 @@
 }
 
 /* ---------- Home ---------- */
-.welcome {
-  font-size: 1.25rem;
-  margin: 0 0 1.1rem;
+.home {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
 }
 
-.page .section-title {
-  margin-top: 1.75rem;
+.welcome {
+  font-size: 1.25rem;
+  margin: 0;
 }
-.page .section-title:first-of-type {
-  margin-top: 0;
+
+.home-highlights {
+  display: flex;
+  flex-direction: column;
+  gap: 1.75rem;
+}
+@media (min-width: 900px) {
+  .home-highlights {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr;
+    gap: 1.5rem;
+  }
 }
 
 /* ---------- Devotion ---------- */
+.devo-page {
+  max-width: 640px;
+  width: 100%;
+  margin: 0 auto;
+}
+
 .devo-header {
   text-align: center;
 }

@@ -5,6 +5,7 @@ import Devotion from "./pages/Devotion";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Members from "./pages/Members";
+import Settings from "./pages/Settings";
 import Signup from "./pages/Signup";
 
 function App() {
@@ -16,6 +17,7 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/devotion" element={<Devotion />} />
         <Route path="/members" element={<Members />} />
+        <Route path="/settings" element={<Settings />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

@@ -68,6 +68,34 @@ export async function login(email: string, password: string): Promise<AuthRespon
   return res.json();
 }
 
+export interface VerseOfTheDay {
+  reference: string;
+  text: string;
+}
+
+export interface BibleVersion {
+  id: string;
+  abbreviation: string;
+  title: string;
+}
+
+export async function getVerseOfTheDay(bibleId?: string | null): Promise<VerseOfTheDay> {
+  const query = bibleId ? `?bibleId=${encodeURIComponent(bibleId)}` : "";
+  const res = await fetch(`${API_URL}/api/verse-of-the-day${query}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch verse of the day (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getBibleVersions(): Promise<BibleVersion[]> {
+  const res = await fetch(`${API_URL}/api/verse-of-the-day/versions`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch Bible versions (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function getUsers(): Promise<User[]> {
   const res = await apiFetch("/api/users");
   if (!res.ok) {
