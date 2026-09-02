@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import "./App.css";
 import ProtectedRoute from "./components/ProtectedRoute";
+import Devotion from "./pages/Devotion";
+import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Members from "./pages/Members";
 import Signup from "./pages/Signup";
@@ -11,7 +13,9 @@ function App() {
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
       <Route element={<ProtectedRoute />}>
-        <Route path="/" element={<Members />} />
+        <Route path="/" element={<Home />} />
+        <Route path="/devotion" element={<Devotion />} />
+        <Route path="/members" element={<Members />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

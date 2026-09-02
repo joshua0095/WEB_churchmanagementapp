@@ -2,7 +2,8 @@ import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { createUser, getUsers, type User } from "../api";
 import { clearToken } from "../auth";
-import { AppHeader, Button, Card, TextField } from "../components/ui";
+import { AppHeader, Button, Card, IconButton, ListRow, TextField } from "../components/ui";
+import { BackIcon } from "../components/ui/icons";
 
 function Members() {
   const [users, setUsers] = useState<User[]>([]);
@@ -56,13 +57,18 @@ function Members() {
   return (
     <>
       <AppHeader
-        title="Jesus Is Lord Church"
-        actions={
+        left={
+          <IconButton aria-label="Back to home" onClick={() => navigate("/")}>
+            <BackIcon />
+          </IconButton>
+        }
+        right={
           <Button variant="secondary" type="button" onClick={handleLogout}>
             Log out
           </Button>
         }
       />
+
       <div className="page">
         <div className="page-header">
           <h1>Church Members</h1>
@@ -101,12 +107,9 @@ function Members() {
               <p className="helper-text">No members yet.</p>
             )}
             {!loading && !error && users.length > 0 && (
-              <ul className="user-list">
+              <ul className="ui-list">
                 {users.map((user) => (
-                  <li key={user.id}>
-                    <strong>{user.name}</strong>
-                    <span className="user-email">{user.email}</span>
-                  </li>
+                  <ListRow key={user.id} primary={user.name} secondary={user.email} />
                 ))}
               </ul>
             )}

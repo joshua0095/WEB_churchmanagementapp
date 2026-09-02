@@ -2,19 +2,20 @@ import { type ReactNode } from "react";
 import Logo from "./Logo";
 
 interface AppHeaderProps {
-  title?: string;
-  actions?: ReactNode;
+  left?: ReactNode;
+  center?: ReactNode;
+  right?: ReactNode;
 }
 
-/** Navy top bar used on authenticated app screens. */
-function AppHeader({ title, actions }: AppHeaderProps) {
+/** Navy top bar used on authenticated app screens; defaults to a centered wordmark. */
+function AppHeader({ left, center, right }: AppHeaderProps) {
   return (
     <header className="app-header">
-      <div className="app-header-brand">
-        <Logo size={32} />
-        {title && <span className="app-header-title">{title}</span>}
+      <div className="app-header-slot app-header-slot--left">{left}</div>
+      <div className="app-header-slot app-header-slot--center">
+        {center ?? <Logo size={34} />}
       </div>
-      {actions && <div className="app-header-actions">{actions}</div>}
+      <div className="app-header-slot app-header-slot--right">{right}</div>
     </header>
   );
 }
