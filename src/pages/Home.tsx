@@ -1,7 +1,15 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getVerseOfTheDay, type VerseOfTheDay } from "../api";
-import { AnnouncementCarousel, AppShell, NavTile, ProfileMenu, VerseCard } from "../components/ui";
+import { getAnnouncements, getVerseOfTheDay, type Announcement, type VerseOfTheDay } from "../api";
+import {
+  AnnouncementCarousel,
+  AppShell,
+  NavTile,
+  ProfileMenu,
+  Skeleton,
+  VerseCard,
+  type AnnouncementItem,
+} from "../components/ui";
 import { getBibleVersionId } from "../preferences";
 import {
   AnnouncementsIcon,
@@ -12,29 +20,34 @@ import {
   UserListIcon,
 } from "../components/ui/icons";
 
-const ANNOUNCEMENTS = [
-  {
-    eyebrow: "REVIVAL: A CALL TO",
-    title: (
-      <>
-        ABSOLUTE
-        <br />
-        OBEDIENCE
-      </>
-    ),
-  },
-];
+function toAnnouncementItem(a: Announcement): AnnouncementItem {
+  return { eyebrow: a.eyebrow, title: a.title, imageDataUrl: a.imageDataUrl };
+}
 
 function Home() {
   const navigate = useNavigate();
 
   const [verse, setVerse] = useState<VerseOfTheDay | null>(null);
   const [verseError, setVerseError] = useState<string | null>(null);
+  const [verseLoading, setVerseLoading] = useState(true);
+  const [announcements, setAnnouncements] = useState<AnnouncementItem[]>([]);
+  const [announcementsError, setAnnouncementsError] = useState<string | null>(null);
+  const [announcementsLoading, setAnnouncementsLoading] = useState(true);
 
   useEffect(() => {
     getVerseOfTheDay(getBibleVersionId())
       .then(setVerse)
-      .catch((err) => setVerseError(err instanceof Error ? err.message : "Failed to load verse"));
+      .catch((err) => setVerseError(err instanceof Error ? err.message : "Failed to load verse"))
+      .finally(() => setVerseLoading(false));
+  }, []);
+
+  useEffect(() => {
+    getAnnouncements()
+      .then((items) => setAnnouncements(items.map(toAnnouncementItem)))
+      .catch((err) =>
+        setAnnouncementsError(err instanceof Error ? err.message : "Failed to load announcements"),
+      )
+      .finally(() => setAnnouncementsLoading(false));
   }, []);
 
   const comingSoon = (name: string) => () => window.alert(`${name} — coming soon`);
@@ -47,15 +60,27 @@ function Home() {
         <div className="home-highlights">
           <section>
             <h2 className="section-title">Announcements</h2>
-            <AnnouncementCarousel items={ANNOUNCEMENTS} />
+            {announcementsLoading ? (
+              <Skeleton className="aspect-video w-full rounded-[14px]" />
+            ) : announcements.length > 0 ? (
+              <AnnouncementCarousel items={announcements} />
+            ) : (
+              <p className="helper-text">{announcementsError ?? "No announcements yet."}</p>
+            )}
           </section>
 
           <section>
             <h2 className="section-title">Verse of the Day</h2>
-            {verse ? (
+            {verseLoading ? (
+              <div className="verse-card">
+                <Skeleton className="mb-2 h-4 w-24" />
+                <Skeleton className="mb-1 h-3 w-full" />
+                <Skeleton className="h-3 w-5/6" />
+              </div>
+            ) : verse ? (
               <VerseCard reference={verse.reference} text={verse.text} />
             ) : (
-              <p className="helper-text">{verseError ?? "Loading verse..."}</p>
+              <p className="helper-text">{verseError}</p>
             )}
           </section>
         </div>
@@ -69,7 +94,7 @@ function Home() {
             <NavTile
               icon={<AnnouncementsIcon />}
               label="Announcements"
-              onClick={comingSoon("Announcements")}
+              onClick={() => navigate("/announcements")}
             />
             <NavTile icon={<UserListIcon />} label="User List" onClick={() => navigate("/members")} />
             <NavTile icon={<SettingsIcon />} label="Settings" onClick={() => navigate("/settings")} />

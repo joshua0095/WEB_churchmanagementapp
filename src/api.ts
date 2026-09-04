@@ -114,3 +114,43 @@ export async function createUser(user: NewUser): Promise<User> {
   }
   return res.json();
 }
+
+export interface Announcement {
+  id: number;
+  eyebrow: string | null;
+  title: string | null;
+  imageDataUrl: string | null;
+  createdAt: string;
+}
+
+export interface AnnouncementRequest {
+  eyebrow: string | null;
+  title: string | null;
+  imageDataUrl: string | null;
+}
+
+export async function getAnnouncements(): Promise<Announcement[]> {
+  const res = await apiFetch("/api/announcements");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch announcements (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function createAnnouncement(announcement: AnnouncementRequest): Promise<Announcement> {
+  const res = await apiFetch("/api/announcements", {
+    method: "POST",
+    body: JSON.stringify(announcement),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to create announcement (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function deleteAnnouncement(id: number): Promise<void> {
+  const res = await apiFetch(`/api/announcements/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`Failed to delete announcement (${res.status})`);
+  }
+}

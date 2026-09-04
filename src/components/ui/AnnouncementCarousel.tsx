@@ -1,8 +1,9 @@
 import { type ReactNode, useState } from "react";
 
 export interface AnnouncementItem {
-  eyebrow: string;
-  title: ReactNode;
+  eyebrow?: string | null;
+  title?: ReactNode;
+  imageDataUrl?: string | null;
 }
 
 interface AnnouncementCarouselProps {
@@ -28,8 +29,15 @@ function AnnouncementCarousel({ items }: AnnouncementCarouselProps) {
           ‹
         </button>
       )}
-      <div className="announce-eyebrow">{item.eyebrow}</div>
-      <h3 className="announce-title">{item.title}</h3>
+      {item.imageDataUrl && (
+        <img className="announce-image" src={item.imageDataUrl} alt="" />
+      )}
+      {(item.eyebrow || item.title) && (
+        <div className={`announce-body${item.imageDataUrl ? " announce-body--overlay" : ""}`}>
+          {item.eyebrow && <div className="announce-eyebrow">{item.eyebrow}</div>}
+          {item.title && <h3 className="announce-title">{item.title}</h3>}
+        </div>
+      )}
       {showArrows && (
         <button
           type="button"

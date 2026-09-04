@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { getBibleVersions, type BibleVersion } from "../api";
-import { AppShell, Card, SelectField } from "../components/ui";
+import { AppShell, Card, SelectField, Skeleton } from "../components/ui";
 import { getBibleVersionId, setBibleVersionId } from "../preferences";
 
 function Settings() {
@@ -32,7 +32,12 @@ function Settings() {
 
       <Card>
         <h2 className="section-title">Verse of the Day</h2>
-        {loading && <p className="helper-text">Loading Bible versions...</p>}
+        {loading && (
+          <div className="flex flex-col gap-2">
+            <Skeleton className="h-3 w-32" />
+            <Skeleton className="h-10 w-full" />
+          </div>
+        )}
         {error && <p className="error">{error}</p>}
         {!loading && !error && (
           <SelectField

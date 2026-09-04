@@ -1,6 +1,14 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { createUser, getUsers, type User } from "../api";
-import { AppShell, Button, Card, ListRow, ProfileMenu, TextField } from "../components/ui";
+import {
+  AppShell,
+  Button,
+  Card,
+  ListRow,
+  ProfileMenu,
+  SkeletonListRow,
+  TextField,
+} from "../components/ui";
 
 function Members() {
   const [users, setUsers] = useState<User[]>([]);
@@ -77,7 +85,13 @@ function Members() {
 
         <Card>
           <h2 className="section-title">Members</h2>
-          {loading && <p className="helper-text">Loading...</p>}
+          {loading && (
+            <ul className="ui-list">
+              <SkeletonListRow />
+              <SkeletonListRow />
+              <SkeletonListRow />
+            </ul>
+          )}
           {error && <p className="error">{error}</p>}
           {!loading && !error && users.length === 0 && (
             <p className="helper-text">No members yet.</p>

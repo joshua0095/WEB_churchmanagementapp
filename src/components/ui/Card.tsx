@@ -5,11 +5,13 @@ interface CardProps {
   className?: string;
 }
 
+const CARD_CLASSES =
+  "bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] " +
+  "p-6 shadow-[var(--shadow-card)]";
+
 function Card({ children, className }: CardProps) {
   return (
-    <section className={["ui-card", className].filter(Boolean).join(" ")}>
-      {children}
-    </section>
+    <section className={[CARD_CLASSES, className].filter(Boolean).join(" ")}>{children}</section>
   );
 }
 

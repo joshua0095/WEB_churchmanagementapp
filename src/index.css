@@ -1,3 +1,9 @@
+/* Theme + utilities only — preflight is skipped so Tailwind doesn't
+   reset the hand-authored base styles below (body/heading/list resets
+   already live in this file and in theme.css/ui.css). */
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+
 @import "./theme.css";
 @import "./components/ui/ui.css";
 
