@@ -345,6 +345,7 @@ function Devotion() {
       await createAnnouncement({
         eyebrow: devo.verse,
         title: truncate(devo.observation || devo.scripture, 80),
+        content: null,
         imageDataUrl: null,
       });
       setBanner(`Shared "${devo.verse}" to Announcements.`);

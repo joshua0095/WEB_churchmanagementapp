@@ -16,6 +16,7 @@ export interface AuthResponse {
   userId: number;
   name: string;
   email: string;
+  isAdmin: boolean;
 }
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -64,6 +65,29 @@ export async function login(email: string, password: string): Promise<AuthRespon
   });
   if (!res.ok) {
     throw new Error(await res.text() || `Login failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function requestPasswordReset(email: string): Promise<void> {
+  const res = await fetch(`${API_URL}/api/auth/request-reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) {
+    throw new Error(await res.text() || `Request failed (${res.status})`);
+  }
+}
+
+export async function confirmPasswordReset(token: string, newPassword: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_URL}/api/auth/confirm-reset`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, newPassword }),
+  });
+  if (!res.ok) {
+    throw new Error(await res.text() || `Reset failed (${res.status})`);
   }
   return res.json();
 }
@@ -151,6 +175,7 @@ export interface Announcement {
   id: number;
   eyebrow: string | null;
   title: string | null;
+  content: string | null;
   imageDataUrl: string | null;
   createdAt: string;
 }
@@ -158,6 +183,7 @@ export interface Announcement {
 export interface AnnouncementRequest {
   eyebrow: string | null;
   title: string | null;
+  content: string | null;
   imageDataUrl: string | null;
 }
 
@@ -185,6 +211,14 @@ export async function deleteAnnouncement(id: number): Promise<void> {
   if (!res.ok) {
     throw new Error(`Failed to delete announcement (${res.status})`);
   }
+}
+
+export async function sendAnnouncement(id: number): Promise<{ sentCount: number }> {
+  const res = await apiFetch(`/api/announcements/${id}/send`, { method: "POST" });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to send announcement (${res.status})`);
+  }
+  return res.json();
 }
 
 export interface Devotion {

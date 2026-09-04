@@ -3,8 +3,10 @@ import {
   createAnnouncement,
   deleteAnnouncement,
   getAnnouncements,
+  sendAnnouncement,
   type Announcement,
 } from "../api";
+import { isAdmin } from "../auth";
 import {
   AppShell,
   Button,
@@ -14,6 +16,7 @@ import {
   SkeletonListRow,
   TextField,
 } from "../components/ui";
+import { confirmDialog, infoAlert } from "../swal";
 
 const ASPECT_RATIO = 16 / 9;
 const ASPECT_TOLERANCE = 0.02;
@@ -56,6 +59,7 @@ function Announcements() {
 
   const [eyebrow, setEyebrow] = useState("");
   const [title, setTitle] = useState("");
+  const [content, setContent] = useState("");
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -94,6 +98,7 @@ function Announcements() {
   const resetForm = () => {
     setEyebrow("");
     setTitle("");
+    setContent("");
     setImageDataUrl(null);
     setImageError(null);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -104,7 +109,7 @@ function Announcements() {
     setFormError(null);
     setSubmitting(true);
     try {
-      await createAnnouncement({ eyebrow, title, imageDataUrl });
+      await createAnnouncement({ eyebrow, title, content, imageDataUrl });
       resetForm();
       await loadAnnouncements();
     } catch (err) {
@@ -120,6 +125,22 @@ function Announcements() {
       await loadAnnouncements();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete announcement");
+    }
+  };
+
+  const handleSend = async (id: number) => {
+    const confirmed = await confirmDialog({
+      title: "Send announcement?",
+      message: "This will email every member. This cannot be undone.",
+      confirmLabel: "Send",
+    });
+    if (!confirmed) return;
+
+    try {
+      const { sentCount } = await sendAnnouncement(id);
+      await infoAlert(`Sent to ${sentCount} member(s).`, "Announcement sent");
+    } catch (err) {
+      await infoAlert(err instanceof Error ? err.message : "Failed to send announcement", "Error");
     }
   };
 
@@ -147,6 +168,17 @@ function Announcements() {
               onChange={(e) => setTitle(e.target.value)}
               placeholder="ABSOLUTE OBEDIENCE"
             />
+
+            <label className="ui-field">
+              <span className="ui-field-label">Content (optional)</span>
+              <textarea
+                className="ui-field-input"
+                rows={4}
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                placeholder="Details to include in the announcement..."
+              />
+            </label>
 
             <label className="ui-field image-upload">
               <span className="ui-field-label">Image (16:9)</span>
@@ -195,14 +227,25 @@ function Announcements() {
                   primary={a.title ?? a.eyebrow ?? "(no text)"}
                   secondary={a.title ? a.eyebrow : null}
                   actions={
-                    <Button
-                      type="button"
-                      variant="danger"
-                      className="!px-[0.7rem] !py-[0.35rem] !text-[0.75rem]"
-                      onClick={() => handleDelete(a.id)}
-                    >
-                      Delete
-                    </Button>
+                    <>
+                      {isAdmin() && (
+                        <Button
+                          type="button"
+                          className="!px-[0.7rem] !py-[0.35rem] !text-[0.75rem]"
+                          onClick={() => handleSend(a.id)}
+                        >
+                          Send to Members
+                        </Button>
+                      )}
+                      <Button
+                        type="button"
+                        variant="danger"
+                        className="!px-[0.7rem] !py-[0.35rem] !text-[0.75rem]"
+                        onClick={() => handleDelete(a.id)}
+                      >
+                        Delete
+                      </Button>
+                    </>
                   }
                 />
               ))}
