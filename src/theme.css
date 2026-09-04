@@ -1,12 +1,4 @@
-/* Jesus Is Lord Church — design tokens (see src/assets/color-palette.md) */
-
-@font-face {
-  font-family: "Garamond Display";
-  src: url("./assets/Adobe Garamond Pro Bold.ttf") format("truetype");
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
+/* JIL Norzagaray Connect — design tokens (see src/assets/color-palette.md) */
 
 :root {
   /* Brand */
@@ -16,7 +8,7 @@
   --color-gold-hover: #d9a604;
 
   /* Surfaces */
-  --color-bg: #fafaf7;
+  --color-bg: #faf6ec;
   --color-surface: #ffffff;
   --color-border: #e7e9ec;
 
@@ -32,8 +24,8 @@
   --color-success: #2f855a;
 
   /* Typography */
-  --font-sans: "Segoe UI", system-ui, -apple-system, sans-serif;
-  --font-display: "Garamond Display", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
 
   /* Shape / elevation */
   --radius-sm: 6px;

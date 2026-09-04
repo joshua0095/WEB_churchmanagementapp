@@ -96,6 +96,38 @@ export async function getBibleVersions(): Promise<BibleVersion[]> {
   return res.json();
 }
 
+export async function getBiblePassage(
+  book: string,
+  chapter: number,
+  verse: number,
+  bibleId?: string | null,
+  verseEnd?: number,
+): Promise<VerseOfTheDay> {
+  const params = new URLSearchParams({ book, chapter: String(chapter), verse: String(verse) });
+  if (verseEnd && verseEnd !== verse) params.set("verseEnd", String(verseEnd));
+  if (bibleId) params.set("bibleId", bibleId);
+  const res = await fetch(`${API_URL}/api/verse-of-the-day/passage?${params}`);
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to fetch that passage (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getChapterVerseCount(
+  book: string,
+  chapter: number,
+  bibleId?: string | null,
+): Promise<number> {
+  const params = new URLSearchParams({ book, chapter: String(chapter) });
+  if (bibleId) params.set("bibleId", bibleId);
+  const res = await fetch(`${API_URL}/api/verse-of-the-day/chapter-length?${params}`);
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to fetch that chapter (${res.status})`);
+  }
+  const data: { verseCount: number } = await res.json();
+  return data.verseCount;
+}
+
 export async function getUsers(): Promise<User[]> {
   const res = await apiFetch("/api/users");
   if (!res.ok) {
@@ -152,5 +184,63 @@ export async function deleteAnnouncement(id: number): Promise<void> {
   const res = await apiFetch(`/api/announcements/${id}`, { method: "DELETE" });
   if (!res.ok) {
     throw new Error(`Failed to delete announcement (${res.status})`);
+  }
+}
+
+export interface Devotion {
+  id: number;
+  date: string;
+  verse: string;
+  scripture: string;
+  observation: string;
+  application: string;
+  prayer: string;
+  notes: string;
+}
+
+export interface DevotionRequest {
+  date: string;
+  verse: string;
+  scripture: string;
+  observation: string;
+  application: string;
+  prayer: string;
+  notes: string;
+}
+
+export async function getDevotions(): Promise<Devotion[]> {
+  const res = await apiFetch("/api/devotions");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch devotions (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function createDevotion(devotion: DevotionRequest): Promise<Devotion> {
+  const res = await apiFetch("/api/devotions", {
+    method: "POST",
+    body: JSON.stringify(devotion),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to create devotion (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function updateDevotion(id: number, devotion: DevotionRequest): Promise<Devotion> {
+  const res = await apiFetch(`/api/devotions/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(devotion),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update devotion (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function deleteDevotion(id: number): Promise<void> {
+  const res = await apiFetch(`/api/devotions/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`Failed to delete devotion (${res.status})`);
   }
 }

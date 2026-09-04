@@ -11,6 +11,7 @@ import {
   type AnnouncementItem,
 } from "../components/ui";
 import { getBibleVersionId } from "../preferences";
+import { infoAlert } from "../swal";
 import {
   AnnouncementsIcon,
   DevotionIcon,
@@ -35,7 +36,7 @@ function Home() {
   const [announcementsLoading, setAnnouncementsLoading] = useState(true);
 
   useEffect(() => {
-    getVerseOfTheDay(getBibleVersionId())
+    getVerseOfTheDay(getBibleVersionId("verseOfTheDay"))
       .then(setVerse)
       .catch((err) => setVerseError(err instanceof Error ? err.message : "Failed to load verse"))
       .finally(() => setVerseLoading(false));
@@ -50,7 +51,7 @@ function Home() {
       .finally(() => setAnnouncementsLoading(false));
   }, []);
 
-  const comingSoon = (name: string) => () => window.alert(`${name} — coming soon`);
+  const comingSoon = (name: string) => () => void infoAlert(`${name} — coming soon`);
 
   return (
     <AppShell headerRight={<ProfileMenu />}>

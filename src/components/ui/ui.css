@@ -75,10 +75,8 @@
 .app-sidebar--open {
   transform: translateX(0);
 }
-.app-sidebar-brand {
-  display: flex;
-  justify-content: center;
-}
+/* .app-sidebar-brand is implemented with Tailwind utility classes
+   directly in AppShell.tsx. */
 .app-sidebar-nav {
   list-style: none;
   margin: 0;
@@ -418,11 +416,8 @@
   flex-direction: column;
   gap: 1.1rem;
 }
-.auth-brand {
-  display: flex;
-  justify-content: center;
-  margin-bottom: -0.5rem;
-}
+/* .auth-brand is implemented with Tailwind utility classes directly
+   in AuthLayout.tsx. */
 .auth-title {
   text-align: center;
   font-size: 0.9rem;

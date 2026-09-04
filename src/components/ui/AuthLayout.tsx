@@ -12,8 +12,11 @@ function AuthLayout({ title, children, footer }: AuthLayoutProps) {
   return (
     <div className="auth-page">
       <div className="auth-card">
-        <div className="auth-brand">
+        <div className="flex flex-col items-center gap-1.5 mb-1">
           <Logo size={140} />
+          <p className="m-0 text-center font-display text-[1.35rem] font-semibold tracking-[0.2px]">
+            JIL Norzagaray Connect
+          </p>
         </div>
         <h1 className="auth-title">{title}</h1>
         {children}

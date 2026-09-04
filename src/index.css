@@ -7,6 +7,22 @@
 @import "./theme.css";
 @import "./components/ui/ui.css";
 
+/* Bridges the brand tokens above into Tailwind's own theme namespace so
+   utilities like `bg-navy`, `text-gold`, and `font-display` are available.
+   theme.css stays the source of truth (see color-palette.md) — these are
+   literal copies of the same values, not references, so Tailwind can read
+   them at build time. */
+@theme {
+  --color-navy: #0b1c33;
+  --color-navy-mid: #16305a;
+  --color-gold: #f2b705;
+  --color-gold-hover: #d9a604;
+  --color-cream: #faf6ec;
+
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -39,4 +55,49 @@ a {
 
 button {
   font-family: inherit;
+}
+
+/* SweetAlert2 theming (see src/swal.ts) — !important is needed because
+   SweetAlert2 injects its own stylesheet at runtime, after this one, so an
+   unqualified rule here would otherwise lose the cascade to its defaults. */
+.swal2-popup {
+  font-family: var(--font-sans) !important;
+  border-radius: var(--radius-lg) !important;
+  background: var(--color-surface) !important;
+  box-shadow: var(--shadow-pop) !important;
+}
+.swal2-title {
+  font-family: var(--font-display) !important;
+  color: var(--color-text-primary) !important;
+}
+.swal2-html-container {
+  font-family: var(--font-sans) !important;
+  color: var(--color-text-secondary) !important;
+}
+.swal2-confirm,
+.swal2-cancel,
+.swal2-deny {
+  border-radius: 8px !important;
+  font-family: inherit !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.2px !important;
+  box-shadow: none !important;
+}
+.swal2-confirm {
+  color: var(--color-text-on-gold) !important;
+}
+.swal2-cancel {
+  color: var(--color-text-on-navy) !important;
+}
+.swal2-icon.swal2-question {
+  border-color: var(--color-gold) !important;
+  color: var(--color-gold) !important;
+}
+.swal2-icon.swal2-warning {
+  border-color: var(--color-danger) !important;
+  color: var(--color-danger) !important;
+}
+.swal2-icon.swal2-info {
+  border-color: var(--color-info) !important;
+  color: var(--color-info) !important;
 }

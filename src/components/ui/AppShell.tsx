@@ -1,5 +1,6 @@
 import { type ReactNode, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { infoAlert } from "../../swal";
 import IconButton from "./IconButton";
 import {
   AnnouncementsIcon,
@@ -22,7 +23,7 @@ const NAV_ITEMS: NavItem[] = [
   { label: "Home", icon: <HomeIcon />, to: "/" },
   { label: "Devotion", icon: <DevotionIcon />, to: "/devotion" },
   { label: "Reports", icon: <ReportsIcon /> },
-  { label: "Announcements", icon: <AnnouncementsIcon /> },
+  { label: "Announcements", icon: <AnnouncementsIcon />, to: "/announcements" },
   { label: "User List", icon: <UserListIcon />, to: "/members" },
   { label: "Settings", icon: <SettingsIcon />, to: "/settings" },
 ];
@@ -45,7 +46,7 @@ function AppShell({ children, headerRight }: AppShellProps) {
     if (item.to) {
       navigate(item.to);
     } else {
-      window.alert(`${item.label} — coming soon`);
+      void infoAlert(`${item.label} — coming soon`);
     }
     setMenuOpen(false);
   };
@@ -53,8 +54,11 @@ function AppShell({ children, headerRight }: AppShellProps) {
   return (
     <div className="app-shell">
       <nav className={["app-sidebar", menuOpen && "app-sidebar--open"].filter(Boolean).join(" ")}>
-        <div className="app-sidebar-brand">
+        <div className="flex flex-col items-center gap-2.5">
           <Logo size={150} />
+          <p className="m-0 text-center font-display text-[1.05rem] font-semibold leading-tight">
+            JIL Norzagaray Connect
+          </p>
         </div>
         <ul className="app-sidebar-nav">
           {NAV_ITEMS.map((item) => (
