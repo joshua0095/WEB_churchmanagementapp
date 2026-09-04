@@ -31,7 +31,10 @@ function Login() {
       title="Log In"
       footer={
         <>
-          Need an account? <Link to="/signup">Sign up here</Link>
+          <p className="m-0">
+            Need an account? <Link to="/signup">Sign up here</Link>
+          </p>
+          <p className="m-0 mt-2 text-[11px] opacity-60">v{__APP_VERSION__}</p>
         </>
       }
     >
