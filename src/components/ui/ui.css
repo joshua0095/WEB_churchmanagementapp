@@ -444,6 +444,70 @@
   margin: 0;
 }
 
+/* ---------- Install banner (mobile-only PWA prompt) ---------- */
+.install-banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.85rem 2.1rem 0.9rem 0.95rem;
+  background: rgba(242, 183, 5, 0.08);
+  border: 1px solid rgba(242, 183, 5, 0.35);
+  border-radius: var(--radius-md);
+}
+.install-banner-title {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--color-gold);
+}
+.install-banner-text {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.4;
+  color: #e7edf5;
+}
+.install-banner-text strong {
+  color: #fff;
+}
+.install-banner-cta {
+  align-self: flex-start;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 0.45rem 0.9rem;
+  background: var(--color-gold);
+  color: var(--color-text-on-gold);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.install-banner-cta:hover {
+  background: var(--color-gold-hover);
+}
+.install-banner-dismiss {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: #c9d6e5;
+  cursor: pointer;
+  padding: 0;
+}
+.install-banner-dismiss svg {
+  width: 0.9rem;
+  height: 0.9rem;
+}
+.install-banner-dismiss:hover {
+  color: #fff;
+}
+
 /* ---------- Announcement image upload ---------- */
 .image-upload {
   display: flex;

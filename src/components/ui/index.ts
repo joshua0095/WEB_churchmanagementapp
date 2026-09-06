@@ -4,6 +4,7 @@ export { default as TextField } from "./TextField";
 export { default as SelectField } from "./SelectField";
 export { default as Card } from "./Card";
 export { default as AuthLayout } from "./AuthLayout";
+export { default as InstallBanner } from "./InstallBanner";
 export { default as AppShell } from "./AppShell";
 export { default as IconButton } from "./IconButton";
 export { default as NavTile } from "./NavTile";

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../api";
 import { setIsAdmin, setToken } from "../auth";
-import { AuthLayout, Button, TextField } from "../components/ui";
+import { AuthLayout, Button, InstallBanner, TextField } from "../components/ui";
 
 function Login() {
   const [email, setEmail] = useState("");
@@ -39,6 +39,7 @@ function Login() {
         </>
       }
     >
+      <InstallBanner />
       <form onSubmit={handleSubmit} className="auth-form">
         <TextField
           label="Email"
