@@ -14,6 +14,9 @@ import {
   Close,
   Cog,
   DotsVertical,
+  ExclamationCircle,
+  Eye,
+  EyeSlash,
   Home,
   Pen,
   Search,
@@ -44,3 +47,6 @@ export const CheckIcon = Check;
 export const ClockIcon = Clock;
 export const LifeGroupIcon = UsersGroup;
 export const ChevronDownIcon = ChevronDown;
+export const ShowPasswordIcon = Eye;
+export const HidePasswordIcon = EyeSlash;
+export const ErrorIcon = ExclamationCircle;

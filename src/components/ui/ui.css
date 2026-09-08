@@ -36,6 +36,41 @@
   background: #fff;
   box-shadow: 0 0 0 3px rgba(242, 183, 5, 0.25);
 }
+.ui-field-input-wrap {
+  position: relative;
+  display: flex;
+}
+.ui-field-input-wrap .ui-field-input {
+  width: 100%;
+}
+.ui-field-input--with-adornment {
+  padding-right: 2.4rem;
+}
+.ui-field-adornment {
+  position: absolute;
+  right: 0.35rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+}
+.ui-field-adornment button {
+  background: none;
+  border: none;
+  padding: 0.3rem;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+  opacity: 0.8;
+  transition: opacity 0.15s ease;
+}
+.ui-field-adornment button:hover {
+  opacity: 1;
+}
+.ui-field-adornment svg {
+  width: 18px;
+  height: 18px;
+}
 
 /* Fields placed on a navy surface (the auth card) need light labels and a
    muted-fill input so they stay legible against the dark background. */
@@ -44,6 +79,12 @@
 }
 .auth-card .ui-field-input {
   background: var(--color-border);
+}
+.auth-card .ui-field-adornment button {
+  color: #c9d6e5;
+}
+.auth-card .ui-field-adornment button:hover {
+  color: #fff;
 }
 
 /* ---------- App shell ---------- */
@@ -408,6 +449,7 @@
   width: 100%;
   max-width: 380px;
   background: var(--color-navy);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: var(--radius-lg);
   padding: 2.25rem 1.75rem 2rem;
   color: #fff;
@@ -419,12 +461,20 @@
 /* .auth-brand is implemented with Tailwind utility classes directly
    in AuthLayout.tsx. */
 .auth-title {
+  font-family: var(--font-sans);
   text-align: center;
   font-size: 0.9rem;
-  font-weight: 800;
+  font-weight: 700;
   letter-spacing: 2px;
   text-transform: uppercase;
   margin: 0;
+}
+.auth-subtitle {
+  margin: -0.6rem 0 0;
+  text-align: center;
+  font-size: 0.85rem;
+  line-height: 1.4;
+  color: #b9c6d9;
 }
 .auth-form {
   display: flex;
@@ -437,11 +487,36 @@
 }
 .auth-footer a {
   color: #e7edf5;
+  font-weight: 600;
+}
+.auth-error,
+.auth-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: var(--radius-md);
+  font-size: 0.83rem;
+  line-height: 1.4;
+  text-align: left;
 }
 .auth-error {
-  color: #ffb4a8;
-  font-size: 0.85rem;
-  margin: 0;
+  background: rgba(181, 52, 42, 0.16);
+  border: 1px solid rgba(255, 132, 116, 0.35);
+  color: #ffc2b8;
+}
+.auth-note {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #cdd9e8;
+}
+.auth-error svg,
+.auth-note svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+  margin-top: 0.1rem;
 }
 
 /* ---------- Install banner (mobile-only PWA prompt) ---------- */

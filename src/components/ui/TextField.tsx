@@ -1,10 +1,11 @@
-import { type InputHTMLAttributes, useId } from "react";
+import { type InputHTMLAttributes, type ReactNode, useId } from "react";
 
 interface TextFieldProps extends InputHTMLAttributes<HTMLInputElement> {
   label: string;
+  endAdornment?: ReactNode;
 }
 
-function TextField({ label, id, className, ...props }: TextFieldProps) {
+function TextField({ label, id, className, endAdornment, ...props }: TextFieldProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
 
@@ -14,7 +15,16 @@ function TextField({ label, id, className, ...props }: TextFieldProps) {
       htmlFor={inputId}
     >
       <span className="ui-field-label">{label}</span>
-      <input id={inputId} className="ui-field-input" {...props} />
+      <div className="ui-field-input-wrap">
+        <input
+          id={inputId}
+          className={["ui-field-input", endAdornment && "ui-field-input--with-adornment"]
+            .filter(Boolean)
+            .join(" ")}
+          {...props}
+        />
+        {endAdornment && <div className="ui-field-adornment">{endAdornment}</div>}
+      </div>
     </label>
   );
 }
