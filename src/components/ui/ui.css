@@ -18,7 +18,7 @@
 .ui-field-input {
   height: 40px;
   border: 1px solid var(--color-border);
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   padding: 0 0.75rem;
   font-family: inherit;
   font-size: 0.95rem;
@@ -92,7 +92,7 @@
   gap: 0.75rem;
   background: none;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: #cdd9e8;
   font-family: inherit;
   font-size: 0.95rem;
@@ -220,7 +220,7 @@
   padding: 0.55rem 0.7rem;
   background: none;
   border: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   color: var(--color-text-primary);
   font-size: 0.95rem;
   cursor: pointer;
@@ -259,7 +259,7 @@
   background: var(--color-navy);
   color: #fff;
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   padding: 14px 6px;
   display: flex;
   flex-direction: column;
@@ -283,7 +283,7 @@
 .announce-card {
   position: relative;
   aspect-ratio: 16 / 9;
-  border-radius: 14px;
+  border-radius: var(--radius-lg);
   overflow: hidden;
   background: linear-gradient(135deg, #f0c33a, var(--color-gold-hover));
   color: var(--color-text-on-gold);
@@ -350,7 +350,7 @@
 .verse-card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 12px;
+  border-radius: var(--radius-md);
   padding: 16px 18px;
   box-shadow: var(--shadow-card);
 }
@@ -379,7 +379,7 @@
 .ui-list-row {
   background: var(--color-navy);
   color: #fff;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   padding: 0.75rem 1rem;
   display: flex;
   justify-content: space-between;
@@ -473,7 +473,7 @@
 .install-banner-cta {
   align-self: flex-start;
   border: none;
-  border-radius: var(--radius-sm);
+  border-radius: var(--radius-md);
   padding: 0.45rem 0.9rem;
   background: var(--color-gold);
   color: var(--color-text-on-gold);
@@ -521,7 +521,7 @@
   width: 100%;
   max-width: 320px;
   aspect-ratio: 16 / 9;
-  border-radius: 10px;
+  border-radius: var(--radius-md);
   border: 2px dashed var(--color-border);
   overflow: hidden;
   background: var(--color-surface-muted, #f4f6f9);
@@ -541,7 +541,7 @@
   flex-shrink: 0;
   width: 56px;
   aspect-ratio: 16 / 9;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   overflow: hidden;
 }
 .ui-list-row-thumb img {

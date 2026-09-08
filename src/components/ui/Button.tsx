@@ -7,7 +7,7 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const BASE_CLASSES =
-  "inline-flex items-center justify-center gap-2 rounded-lg border-none px-[1.4rem] py-[0.7rem] " +
+  "inline-flex items-center justify-center gap-2 rounded-md border-none px-[1.4rem] py-[0.7rem] " +
   "text-[0.95rem] font-bold tracking-[0.2px] cursor-pointer transition duration-150 " +
   "active:scale-[0.98] disabled:opacity-60 disabled:cursor-not-allowed disabled:scale-100";
 

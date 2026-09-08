@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../api";
-import { setIsAdmin, setToken } from "../auth";
+import { setIsAdmin, setIsRegistrar, setModuleAccess, setToken } from "../auth";
 import { AuthLayout, Button, InstallBanner, TextField } from "../components/ui";
 
 function Login() {
@@ -19,6 +19,8 @@ function Login() {
       const auth = await login(email, password);
       setToken(auth.token);
       setIsAdmin(auth.isAdmin);
+      setIsRegistrar(auth.isRegistrar);
+      setModuleAccess(auth.moduleAccess);
       navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");

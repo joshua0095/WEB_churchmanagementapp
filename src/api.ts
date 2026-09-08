@@ -4,11 +4,20 @@ export interface User {
   id: string | number;
   name: string;
   email: string;
+  isAdmin: boolean;
+  isRegistrar: boolean;
+  isActive: boolean;
+  birthday: string | null;
+  ministryIds: number[];
+  networkIds: number[];
 }
 
-export interface NewUser {
+export interface UserFormRequest {
   name: string;
   email: string;
+  birthday: string | null;
+  ministryIds: number[];
+  networkIds: number[];
 }
 
 export interface AuthResponse {
@@ -17,6 +26,8 @@ export interface AuthResponse {
   name: string;
   email: string;
   isAdmin: boolean;
+  isRegistrar: boolean;
+  moduleAccess: Record<string, boolean>;
 }
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -160,15 +171,218 @@ export async function getUsers(): Promise<User[]> {
   return res.json();
 }
 
-export async function createUser(user: NewUser): Promise<User> {
+export async function createUser(user: UserFormRequest): Promise<{ user: User; temporaryPassword: string }> {
   const res = await apiFetch("/api/users", {
     method: "POST",
     body: JSON.stringify(user),
   });
   if (!res.ok) {
-    throw new Error(`Failed to create user (${res.status})`);
+    throw new Error((await res.text()) || `Failed to create user (${res.status})`);
   }
   return res.json();
+}
+
+export async function updateUser(id: number | string, user: UserFormRequest): Promise<User> {
+  const res = await apiFetch(`/api/users/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(user),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update user (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function setUserRegistrar(id: number | string, isRegistrar: boolean): Promise<User> {
+  const res = await apiFetch(`/api/users/${id}/registrar`, {
+    method: "PUT",
+    body: JSON.stringify({ isRegistrar }),
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to update registrar status (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function setUserActive(id: number | string, isActive: boolean): Promise<User> {
+  const res = await apiFetch(`/api/users/${id}/active`, {
+    method: "PUT",
+    body: JSON.stringify({ isActive }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update account status (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function resetUserPassword(id: number | string): Promise<{ temporaryPassword: string }> {
+  const res = await apiFetch(`/api/users/${id}/reset-password`, { method: "POST" });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to reset password (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function deleteUser(id: number | string): Promise<void> {
+  const res = await apiFetch(`/api/users/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to delete user (${res.status})`);
+  }
+}
+
+// ---------- Ministries / Networks ----------
+
+export interface Network {
+  id: number;
+  name: string;
+}
+
+export interface Ministry {
+  id: number;
+  name: string;
+  networkId: number;
+}
+
+export interface NetworkRequest {
+  name: string;
+}
+
+export interface MinistryRequest {
+  name: string;
+  networkId: number;
+}
+
+export async function getNetworks(): Promise<Network[]> {
+  const res = await apiFetch("/api/networks");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch networks (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function createNetwork(network: NetworkRequest): Promise<Network> {
+  const res = await apiFetch("/api/networks", {
+    method: "POST",
+    body: JSON.stringify(network),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to add network (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function updateNetwork(id: number, network: NetworkRequest): Promise<Network> {
+  const res = await apiFetch(`/api/networks/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(network),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update network (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function deleteNetwork(id: number): Promise<void> {
+  const res = await apiFetch(`/api/networks/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to delete network (${res.status})`);
+  }
+}
+
+export async function getMinistries(): Promise<Ministry[]> {
+  const res = await apiFetch("/api/ministries");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ministries (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function createMinistry(ministry: MinistryRequest): Promise<Ministry> {
+  const res = await apiFetch("/api/ministries", {
+    method: "POST",
+    body: JSON.stringify(ministry),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to add ministry (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function updateMinistry(id: number, ministry: MinistryRequest): Promise<Ministry> {
+  const res = await apiFetch(`/api/ministries/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(ministry),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update ministry (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function deleteMinistry(id: number): Promise<void> {
+  const res = await apiFetch(`/api/ministries/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to delete ministry (${res.status})`);
+  }
+}
+
+// ---------- Congregation ----------
+
+export type Gender = "Male" | "Female";
+
+export interface CongregationMember {
+  id: number;
+  name: string;
+  birthday: string | null;
+  gender: Gender | null;
+  createdAt: string;
+  oldCategory: string | null;
+  newCategory: string | null;
+}
+
+export interface CongregationMemberRequest {
+  name: string;
+  birthday: string | null;
+  gender: Gender | null;
+  oldCategory: string | null;
+  newCategory: string | null;
+}
+
+export async function getCongregation(): Promise<CongregationMember[]> {
+  const res = await apiFetch("/api/congregation");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch congregation (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function createCongregant(member: CongregationMemberRequest): Promise<CongregationMember> {
+  const res = await apiFetch("/api/congregation", {
+    method: "POST",
+    body: JSON.stringify(member),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to add congregation member (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function updateCongregant(id: number, member: CongregationMemberRequest): Promise<CongregationMember> {
+  const res = await apiFetch(`/api/congregation/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(member),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update congregation member (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function deleteCongregant(id: number): Promise<void> {
+  const res = await apiFetch(`/api/congregation/${id}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`Failed to delete congregation member (${res.status})`);
+  }
 }
 
 export interface Announcement {
@@ -277,4 +491,371 @@ export async function deleteDevotion(id: number): Promise<void> {
   if (!res.ok) {
     throw new Error(`Failed to delete devotion (${res.status})`);
   }
+}
+
+// ---------- Attendance (Workers / Congregation) ----------
+
+export interface AttendanceEvent {
+  id: number;
+  name: string;
+}
+
+export interface AttendanceSessionInfo {
+  id: number;
+  eventId: number;
+  date: string;
+}
+
+export type PersonType = "Worker" | "Attendee";
+
+export interface AttendancePerson {
+  personId: number;
+  name: string;
+  recordId: number | null;
+  checkedInAt: string | null;
+}
+
+export interface AttendanceRoster {
+  total: number;
+  checkedInCount: number;
+  people: AttendancePerson[];
+}
+
+export async function getAttendanceEvents(): Promise<AttendanceEvent[]> {
+  const res = await apiFetch("/api/attendance/events");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch events (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function openAttendanceSession(eventId: number, date: string): Promise<AttendanceSessionInfo> {
+  const res = await apiFetch("/api/attendance/sessions", {
+    method: "POST",
+    body: JSON.stringify({ eventId, date }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to open session (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getWorkerRoster(sessionId: number): Promise<AttendanceRoster> {
+  const res = await apiFetch(`/api/attendance/sessions/${sessionId}/workers`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch worker roster (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getCongregationRoster(sessionId: number): Promise<AttendanceRoster> {
+  const res = await apiFetch(`/api/attendance/sessions/${sessionId}/congregation`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch congregation roster (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function checkInAttendance(
+  sessionId: number,
+  personType: PersonType,
+  personId: number,
+): Promise<{ recordId: number; checkedInAt: string }> {
+  const res = await apiFetch(`/api/attendance/sessions/${sessionId}/checkin`, {
+    method: "POST",
+    body: JSON.stringify({ personType, personId }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to check in (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function undoCheckIn(recordId: number): Promise<void> {
+  const res = await apiFetch(`/api/attendance/records/${recordId}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`Failed to remove check-in (${res.status})`);
+  }
+}
+
+export async function editCheckInTime(
+  recordId: number,
+  checkedInAt: string,
+): Promise<{ recordId: number; checkedInAt: string }> {
+  const res = await apiFetch(`/api/attendance/records/${recordId}/time`, {
+    method: "PUT",
+    body: JSON.stringify({ checkedInAt }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update time (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function addWalkIn(sessionId: number, name: string): Promise<AttendancePerson> {
+  const res = await apiFetch(`/api/attendance/sessions/${sessionId}/congregation-members`, {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to add walk-in (${res.status})`);
+  }
+  return res.json();
+}
+
+export interface AttendanceReport {
+  eventId: number;
+  date: string;
+  workers: AttendanceRoster;
+  congregation: AttendanceRoster;
+}
+
+export async function getAttendanceReport(eventId: number, date: string): Promise<AttendanceReport> {
+  const params = new URLSearchParams({ eventId: String(eventId), date });
+  const res = await apiFetch(`/api/attendance/report?${params}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch report (${res.status})`);
+  }
+  return res.json();
+}
+
+export interface AttendanceTrendPoint {
+  date: string;
+  workerCheckedIn: number;
+  workerTotal: number;
+  congregationCheckedIn: number;
+  congregationTotal: number;
+}
+
+export async function getAttendanceTrend(eventId: number): Promise<AttendanceTrendPoint[]> {
+  const params = new URLSearchParams({ eventId: String(eventId) });
+  const res = await apiFetch(`/api/attendance/report/trend?${params}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch trend (${res.status})`);
+  }
+  return res.json();
+}
+
+// ---------- Life Groups ----------
+
+export interface LifeGroupSummary {
+  id: number;
+  groupName: string;
+  leaderId: number;
+  leaderName: string;
+  memberCount: number;
+}
+
+export interface LifeGroup {
+  id: number;
+  leaderId: number;
+  groupName: string;
+}
+
+export interface LifeGroupMember {
+  id: number;
+  lifeGroupId: number;
+  name: string;
+}
+
+export interface LifeGroupDetail {
+  id: number;
+  groupName: string;
+  leaderId: number;
+  leaderName: string;
+  members: LifeGroupMember[];
+}
+
+export interface LifeGroupSessionInfo {
+  id: number;
+  lifeGroupId: number;
+  date: string;
+  weekNumber: number;
+}
+
+export interface LifeGroupPerson {
+  memberId: number;
+  name: string;
+  recordId: number | null;
+}
+
+export interface LifeGroupRoster {
+  weekNumber: number;
+  date: string;
+  total: number;
+  checkedInCount: number;
+  people: LifeGroupPerson[];
+}
+
+export interface LifeGroupTrendPoint {
+  weekNumber: number;
+  date: string;
+  checkedIn: number;
+  total: number;
+}
+
+export async function getLifeGroupsSummary(date: string): Promise<{ total: number; checkedInCount: number }> {
+  const params = new URLSearchParams({ date });
+  const res = await apiFetch(`/api/lifegroups/summary?${params}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch life groups summary (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getLifeGroups(): Promise<LifeGroupSummary[]> {
+  const res = await apiFetch("/api/lifegroups");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch life groups (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function createLifeGroup(leaderId: number, groupName: string): Promise<LifeGroup> {
+  const res = await apiFetch("/api/lifegroups", {
+    method: "POST",
+    body: JSON.stringify({ leaderId, groupName }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to create life group (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getMyLifeGroups(): Promise<LifeGroup[]> {
+  const res = await apiFetch("/api/lifegroups/mine");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch your life groups (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getLifeGroup(id: number): Promise<LifeGroupDetail> {
+  const res = await apiFetch(`/api/lifegroups/${id}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch life group (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function addLifeGroupMember(id: number, name: string): Promise<LifeGroupMember> {
+  const res = await apiFetch(`/api/lifegroups/${id}/members`, {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to add member (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function openLifeGroupSession(id: number, date: string): Promise<LifeGroupSessionInfo> {
+  const res = await apiFetch(`/api/lifegroups/${id}/sessions`, {
+    method: "POST",
+    body: JSON.stringify({ date }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to open session (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getLifeGroupRoster(sessionId: number): Promise<LifeGroupRoster> {
+  const res = await apiFetch(`/api/lifegroups/sessions/${sessionId}/roster`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch roster (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function lifeGroupCheckIn(sessionId: number, memberId: number): Promise<{ recordId: number }> {
+  const res = await apiFetch(`/api/lifegroups/sessions/${sessionId}/checkin`, {
+    method: "POST",
+    body: JSON.stringify({ memberId }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to check in (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function undoLifeGroupCheckIn(recordId: number): Promise<void> {
+  const res = await apiFetch(`/api/lifegroups/records/${recordId}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`Failed to remove check-in (${res.status})`);
+  }
+}
+
+export async function getLifeGroupTrend(id: number): Promise<LifeGroupTrendPoint[]> {
+  const res = await apiFetch(`/api/lifegroups/${id}/report/trend`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch trend (${res.status})`);
+  }
+  return res.json();
+}
+
+// ---------- Module access (per-network) ----------
+
+export const MODULES = ["Attendance", "Reports", "Announcements", "People"] as const;
+export type ModuleName = (typeof MODULES)[number];
+
+export interface ModuleAccessRow {
+  networkId: number;
+  module: ModuleName;
+  isAllowed: boolean;
+}
+
+export interface SetModuleAccessRequest {
+  networkId: number;
+  module: ModuleName;
+  isAllowed: boolean;
+}
+
+export async function getModuleAccess(): Promise<ModuleAccessRow[]> {
+  const res = await apiFetch("/api/module-access");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch module access (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function setModuleAccessRule(request: SetModuleAccessRequest): Promise<ModuleAccessRow> {
+  const res = await apiFetch("/api/module-access", {
+    method: "PUT",
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update module access (${res.status})`);
+  }
+  return res.json();
+}
+
+// ---------- Congregation breakdown report ----------
+
+export interface CongregationBreakdownRow {
+  label: string;
+  weekCounts: number[];
+  average: number;
+  actual: number;
+}
+
+export interface CongregationBreakdownReport {
+  weekDates: string[];
+  byLifeGroup: CongregationBreakdownRow[];
+  byLifeGroupFirstTimers: CongregationBreakdownRow[];
+  byAgeBracket: CongregationBreakdownRow[];
+  byAgeBracketFirstTimers: CongregationBreakdownRow[];
+}
+
+export async function getCongregationBreakdown(
+  eventId: number,
+  year: number,
+  month: number,
+): Promise<CongregationBreakdownReport> {
+  const params = new URLSearchParams({ eventId: String(eventId), year: String(year), month: String(month) });
+  const res = await apiFetch(`/api/attendance/report/congregation-breakdown?${params}`);
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to fetch congregation breakdown (${res.status})`);
+  }
+  return res.json();
 }

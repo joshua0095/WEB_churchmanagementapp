@@ -14,6 +14,7 @@ import { getBibleVersionId } from "../preferences";
 import { infoAlert } from "../swal";
 import {
   AnnouncementsIcon,
+  AttendanceIcon,
   DevotionIcon,
   HomeIcon,
   ReportsIcon,
@@ -62,7 +63,7 @@ function Home() {
           <section>
             <h2 className="section-title">Announcements</h2>
             {announcementsLoading ? (
-              <Skeleton className="aspect-video w-full rounded-[14px]" />
+              <Skeleton className="aspect-video w-full rounded-lg" />
             ) : announcements.length > 0 ? (
               <AnnouncementCarousel items={announcements} />
             ) : (
@@ -91,6 +92,7 @@ function Home() {
           <div className="nav-grid">
             <NavTile icon={<HomeIcon />} label="Home" onClick={() => navigate("/")} />
             <NavTile icon={<DevotionIcon />} label="Devotion" onClick={() => navigate("/devotion")} />
+            <NavTile icon={<AttendanceIcon />} label="Attendance" onClick={() => navigate("/attendance")} />
             <NavTile icon={<ReportsIcon />} label="Reports" onClick={comingSoon("Reports")} />
             <NavTile
               icon={<AnnouncementsIcon />}

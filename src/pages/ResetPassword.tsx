@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { confirmPasswordReset } from "../api";
-import { setIsAdmin, setToken } from "../auth";
+import { setIsAdmin, setIsRegistrar, setModuleAccess, setToken } from "../auth";
 import { AuthLayout, Button, TextField } from "../components/ui";
 
 function ResetPassword() {
@@ -22,6 +22,8 @@ function ResetPassword() {
       const auth = await confirmPasswordReset(token, newPassword);
       setToken(auth.token);
       setIsAdmin(auth.isAdmin);
+      setIsRegistrar(auth.isRegistrar);
+      setModuleAccess(auth.moduleAccess);
       navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reset failed");

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { MoreIcon } from "./icons";
 
 export interface DropdownMenuItem {
@@ -13,23 +14,53 @@ interface DropdownMenuProps {
   ariaLabel: string;
 }
 
-/** Three-dot "more actions" menu. Closes on an outside click or after picking an item. */
+const MENU_WIDTH = 190;
+
+/**
+ * Three-dot "more actions" menu. Closes on an outside click or after picking an item.
+ *
+ * The menu itself is rendered through a portal into document.body instead of as a child
+ * of the trigger button — otherwise a scrollable ancestor (e.g. a table wrapped in
+ * `overflow-x-auto`) clips it. Per the CSS overflow spec, setting overflow-x to anything
+ * but visible forces the computed overflow-y to auto too, so a short container (as short
+ * as a single table row) cuts the menu off instead of letting it float over the page.
+ */
 function DropdownMenu({ items, ariaLabel }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
-  const rootRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (!open) return;
-    const onClickAway = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+
+    const updatePosition = () => {
+      const rect = buttonRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      setPosition({ top: rect.bottom + 4, left: rect.right - MENU_WIDTH });
     };
+    updatePosition();
+
+    const onClickAway = (e: MouseEvent) => {
+      const target = e.target as Node;
+      if (buttonRef.current?.contains(target) || menuRef.current?.contains(target)) return;
+      setOpen(false);
+    };
+
     document.addEventListener("mousedown", onClickAway);
-    return () => document.removeEventListener("mousedown", onClickAway);
+    window.addEventListener("scroll", updatePosition, true);
+    window.addEventListener("resize", updatePosition);
+    return () => {
+      document.removeEventListener("mousedown", onClickAway);
+      window.removeEventListener("scroll", updatePosition, true);
+      window.removeEventListener("resize", updatePosition);
+    };
   }, [open]);
 
   return (
-    <div className="relative" ref={rootRef}>
+    <>
       <button
+        ref={buttonRef}
         type="button"
         aria-label={ariaLabel}
         aria-haspopup="menu"
@@ -42,36 +73,41 @@ function DropdownMenu({ items, ariaLabel }: DropdownMenuProps) {
       >
         <MoreIcon />
       </button>
-      {open && (
-        <div
-          role="menu"
-          className="absolute right-0 top-full z-20 mt-1 min-w-[190px] overflow-hidden rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-lg"
-        >
-          {items.map((item) => (
-            <div key={item.label}>
-              {item.dividerBefore && <div className="my-1 border-t border-[var(--color-border)]" />}
-              <button
-                type="button"
-                role="menuitem"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setOpen(false);
-                  item.onSelect();
-                }}
-                className={[
-                  "block w-full border-0 bg-transparent px-3.5 py-2 text-left text-sm font-medium transition-colors",
-                  item.danger
-                    ? "text-[var(--color-danger)] hover:bg-red-50"
-                    : "text-[var(--color-text-primary)] hover:bg-black/5",
-                ].join(" ")}
-              >
-                {item.label}
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
+      {open &&
+        position &&
+        createPortal(
+          <div
+            ref={menuRef}
+            role="menu"
+            style={{ position: "fixed", top: position.top, left: position.left, width: MENU_WIDTH }}
+            className="z-50 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-lg"
+          >
+            {items.map((item) => (
+              <div key={item.label}>
+                {item.dividerBefore && <div className="my-1 border-t border-[var(--color-border)]" />}
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setOpen(false);
+                    item.onSelect();
+                  }}
+                  className={[
+                    "block w-full border-0 bg-transparent px-3.5 py-2 text-left text-sm font-medium transition-colors",
+                    item.danger
+                      ? "text-[var(--color-danger)] hover:bg-red-50"
+                      : "text-[var(--color-text-primary)] hover:bg-black/5",
+                  ].join(" ")}
+                >
+                  {item.label}
+                </button>
+              </div>
+            ))}
+          </div>,
+          document.body,
+        )}
+    </>
   );
 }
 

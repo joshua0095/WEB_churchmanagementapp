@@ -19,3 +19,7 @@ export { default as DropdownMenu } from "./DropdownMenu";
 export type { DropdownMenuItem } from "./DropdownMenu";
 export { default as Modal } from "./Modal";
 export { default as VersePicker } from "./VersePicker";
+export { default as Chip } from "./Chip";
+export { default as ProgressBar } from "./ProgressBar";
+export { default as Accordion } from "./Accordion";
+export { default as Pagination } from "./Pagination";

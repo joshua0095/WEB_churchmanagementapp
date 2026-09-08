@@ -21,6 +21,13 @@
 
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+
+  /* Same bridge as above, for the `--radius-*` scale: makes `rounded-sm`,
+     `rounded-md`, and `rounded-lg` resolve to this app's 6px/10px/16px
+     scale everywhere instead of Tailwind's own defaults. */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
 }
 
 * {
@@ -77,7 +84,7 @@ button {
 .swal2-confirm,
 .swal2-cancel,
 .swal2-deny {
-  border-radius: 8px !important;
+  border-radius: var(--radius-md) !important;
   font-family: inherit !important;
   font-weight: 700 !important;
   letter-spacing: 0.2px !important;

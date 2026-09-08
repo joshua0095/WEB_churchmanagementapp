@@ -17,3 +17,17 @@ export function getBibleVersionId(module: BibleModule): string | null {
 export function setBibleVersionId(module: BibleModule, id: string): void {
   localStorage.setItem(MODULE_KEYS[module], id);
 }
+
+export type PaginatedTable = "peopleUsers" | "peopleCongregation" | "peopleNetworks" | "peopleMinistries";
+
+const PAGE_SIZE_KEY_PREFIX = "pageSize:";
+
+export function getPageSize(table: PaginatedTable, fallback: number): number {
+  const raw = localStorage.getItem(`${PAGE_SIZE_KEY_PREFIX}${table}`);
+  const parsed = raw ? Number(raw) : NaN;
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+export function setPageSize(table: PaginatedTable, size: number): void {
+  localStorage.setItem(`${PAGE_SIZE_KEY_PREFIX}${table}`, String(size));
+}

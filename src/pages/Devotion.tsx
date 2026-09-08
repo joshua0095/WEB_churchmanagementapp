@@ -364,7 +364,7 @@ function Devotion() {
       </div>
 
       {banner && (
-        <div className="mb-4 rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm text-[var(--color-text-primary)] shadow-sm">
+        <div className="mb-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm text-[var(--color-text-primary)] shadow-[var(--shadow-card)]">
           {banner}
         </div>
       )}
@@ -376,7 +376,7 @@ function Devotion() {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           aria-label="Search devotions"
-          className="h-11 w-full rounded-lg border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-sm text-[var(--color-text-primary)] outline-none transition-shadow focus:border-[var(--color-gold)] focus:shadow-[0_0_0_3px_rgba(242,183,5,0.25)]"
+          className="h-11 w-full rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-sm text-[var(--color-text-primary)] outline-none transition-shadow focus:border-[var(--color-gold)] focus:shadow-[0_0_0_3px_rgba(242,183,5,0.25)]"
         />
 
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -423,7 +423,7 @@ function Devotion() {
       {loading ? (
         <div className="flex flex-col gap-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="rounded-xl border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-sm">
+            <div key={i} className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
               <div className="flex items-center justify-between gap-3">
                 <Skeleton className="h-5 w-44" />
                 <Skeleton className="h-8 w-8 rounded-full" />
@@ -456,7 +456,7 @@ function Devotion() {
                     <article
                       key={devo.id}
                       className={[
-                        "rounded-xl bg-[var(--color-surface)] p-4 shadow-sm transition-shadow hover:shadow-md",
+                        "rounded-md bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-pop)]",
                         today
                           ? "border border-l-4 border-[var(--color-border)] border-l-[var(--color-gold)]"
                           : "border border-[var(--color-border)]",
@@ -536,7 +536,7 @@ function Devotion() {
           </label>
 
           {duplicateDateDevo && (
-            <div className="flex flex-col items-start rounded-lg border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">
+            <div className="flex flex-col items-start rounded-md border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">
               <p className="m-1">
                 You already have a devotion for{" "}
                 {isSameDay(parseDateInputValue(form.date), new Date())
@@ -547,7 +547,7 @@ function Devotion() {
               <button
                 type="button"
                 onClick={() => openEdit(duplicateDateDevo)}
-                className="mt-0 rounded-lg border-0 bg-amber-900 px-3.5 py-1.5 text-sm font-semibold text-amber-50 transition-opacity hover:opacity-90"
+                className="mt-0 rounded-md border-0 bg-amber-900 px-3.5 py-1.5 text-sm font-semibold text-amber-50 transition-opacity hover:opacity-90"
               >
                 Edit that devotion instead
               </button>
@@ -580,7 +580,7 @@ function Devotion() {
               <span className="ui-field-label">{field.label}</span>
               <textarea
                 ref={autoGrowRef}
-                className="min-h-36 w-full resize-y rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 font-sans text-sm text-[var(--color-text-primary)] outline-none transition-shadow focus:border-[var(--color-gold)] focus:shadow-[0_0_0_3px_rgba(242,183,5,0.25)] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-28"
+                className="min-h-36 w-full resize-y rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 font-sans text-sm text-[var(--color-text-primary)] outline-none transition-shadow focus:border-[var(--color-gold)] focus:shadow-[0_0_0_3px_rgba(242,183,5,0.25)] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-28"
                 value={form[field.key]}
                 onChange={(e) => updateForm(field.key, e.target.value)}
                 onInput={(e) => autoGrowRef(e.currentTarget)}
@@ -595,7 +595,7 @@ function Devotion() {
             <span className="ui-field-label">Notes / comments (optional)</span>
             <textarea
               ref={autoGrowRef}
-              className="min-h-24 w-full resize-none overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 font-sans text-sm text-[var(--color-text-primary)] outline-none transition-shadow focus:border-[var(--color-gold)] focus:shadow-[0_0_0_3px_rgba(242,183,5,0.25)] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-20"
+              className="min-h-24 w-full resize-none overflow-hidden rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 font-sans text-sm text-[var(--color-text-primary)] outline-none transition-shadow focus:border-[var(--color-gold)] focus:shadow-[0_0_0_3px_rgba(242,183,5,0.25)] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-20"
               value={form.notes}
               onChange={(e) => updateForm("notes", e.target.value)}
               onInput={(e) => autoGrowRef(e.currentTarget)}

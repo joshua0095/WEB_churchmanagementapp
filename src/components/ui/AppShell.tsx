@@ -1,9 +1,11 @@
 import { type ReactNode, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
+import { canAccessModule } from "../../auth";
 import { infoAlert } from "../../swal";
 import IconButton from "./IconButton";
 import {
   AnnouncementsIcon,
+  AttendanceIcon,
   DevotionIcon,
   HomeIcon,
   MenuIcon,
@@ -17,14 +19,17 @@ interface NavItem {
   label: string;
   icon: ReactNode;
   to?: string;
+  /** Ministry-configurable module this nav item belongs to — hidden if the user's ministries don't grant access. Omit for items everyone always sees. */
+  module?: string;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { label: "Home", icon: <HomeIcon />, to: "/" },
   { label: "Devotion", icon: <DevotionIcon />, to: "/devotion" },
-  { label: "Reports", icon: <ReportsIcon /> },
-  { label: "Announcements", icon: <AnnouncementsIcon />, to: "/announcements" },
-  { label: "User List", icon: <UserListIcon />, to: "/members" },
+  { label: "Attendance", icon: <AttendanceIcon />, to: "/attendance", module: "Attendance" },
+  { label: "Reports", icon: <ReportsIcon />, to: "/reports", module: "Reports" },
+  { label: "Announcements", icon: <AnnouncementsIcon />, to: "/announcements", module: "Announcements" },
+  { label: "People", icon: <UserListIcon />, to: "/people", module: "People" },
   { label: "Settings", icon: <SettingsIcon />, to: "/settings" },
 ];
 
@@ -61,7 +66,7 @@ function AppShell({ children, headerRight }: AppShellProps) {
           </p>
         </div>
         <ul className="app-sidebar-nav">
-          {NAV_ITEMS.map((item) => (
+          {NAV_ITEMS.filter((item) => !item.module || canAccessModule(item.module)).map((item) => (
             <li key={item.label}>
               <button
                 type="button"

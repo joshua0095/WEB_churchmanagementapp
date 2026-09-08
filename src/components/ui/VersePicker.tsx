@@ -14,10 +14,10 @@ interface VersePickerProps {
 }
 
 const TILE_CLASS =
-  "flex aspect-square items-center justify-center rounded-md border border-[var(--color-border)] bg-white text-sm font-semibold text-[var(--color-text-primary)] transition-colors hover:border-[var(--color-navy)] hover:bg-[var(--color-navy)]/5";
+  "flex aspect-square items-center justify-center rounded-sm border border-[var(--color-border)] bg-white text-sm font-semibold text-[var(--color-text-primary)] transition-colors hover:border-[var(--color-navy)] hover:bg-[var(--color-navy)]/5";
 
 const SELECTED_TILE_CLASS =
-  "flex aspect-square items-center justify-center rounded-md border border-[var(--color-navy)] bg-[var(--color-navy)] text-sm font-semibold text-white transition-colors";
+  "flex aspect-square items-center justify-center rounded-sm border border-[var(--color-navy)] bg-[var(--color-navy)] text-sm font-semibold text-white transition-colors";
 
 const BACK_BUTTON_CLASS =
   "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-0 bg-transparent text-[var(--color-text-secondary)] hover:bg-black/5 hover:text-[var(--color-text-primary)]";

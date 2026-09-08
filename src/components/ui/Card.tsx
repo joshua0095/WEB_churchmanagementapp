@@ -6,7 +6,7 @@ interface CardProps {
 }
 
 const CARD_CLASSES =
-  "bg-[var(--color-surface)] border border-[var(--color-border)] rounded-[var(--radius-md)] " +
+  "bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md " +
   "p-6 shadow-[var(--shadow-card)]";
 
 function Card({ children, className }: CardProps) {

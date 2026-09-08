@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register } from "../api";
-import { setIsAdmin, setToken } from "../auth";
+import { setIsAdmin, setIsRegistrar, setModuleAccess, setToken } from "../auth";
 import { AuthLayout, Button, TextField } from "../components/ui";
 
 function Signup() {
@@ -20,6 +20,8 @@ function Signup() {
       const auth = await register(name, email, password);
       setToken(auth.token);
       setIsAdmin(auth.isAdmin);
+      setIsRegistrar(auth.isRegistrar);
+      setModuleAccess(auth.moduleAccess);
       navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");

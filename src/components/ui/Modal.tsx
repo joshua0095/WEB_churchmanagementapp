@@ -55,8 +55,8 @@ function Modal({
         aria-label={title}
         className={
           large
-            ? "relative flex h-full w-full flex-col bg-[var(--color-surface)] sm:h-auto sm:max-h-[85vh] sm:w-full sm:max-w-2xl sm:rounded-2xl sm:shadow-2xl"
-            : "relative flex max-h-[85vh] w-full max-w-md flex-col rounded-2xl bg-[var(--color-surface)] p-6 shadow-2xl"
+            ? "relative flex h-full w-full flex-col bg-[var(--color-surface)] sm:h-auto sm:max-h-[85vh] sm:w-full sm:max-w-2xl sm:rounded-lg sm:shadow-2xl"
+            : "relative flex max-h-[85vh] w-full max-w-md flex-col rounded-lg bg-[var(--color-surface)] p-6 shadow-2xl"
         }
       >
         <div
