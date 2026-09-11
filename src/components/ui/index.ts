@@ -23,3 +23,5 @@ export { default as Chip } from "./Chip";
 export { default as ProgressBar } from "./ProgressBar";
 export { default as Accordion } from "./Accordion";
 export { default as Pagination } from "./Pagination";
+export { default as FilterBar } from "./FilterBar";
+export { default as DatePicker } from "./DatePicker";

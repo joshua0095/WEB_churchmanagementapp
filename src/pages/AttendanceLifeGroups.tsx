@@ -27,6 +27,7 @@ import {
   TextField,
 } from "../components/ui";
 import { BackIcon } from "../components/ui/icons";
+import { successToast } from "../swal";
 
 function todayIso(): string {
   const d = new Date();
@@ -119,6 +120,7 @@ function AttendanceLifeGroups() {
       setNewLeaderId("");
       setAddGroupOpen(false);
       await loadGroups(true);
+      successToast("Life group added");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to create life group");
     } finally {
@@ -136,6 +138,7 @@ function AttendanceLifeGroups() {
       setAddMemberGroupId(null);
       await loadGroups(true);
       await refreshGroupSession(groupId);
+      successToast("Member added");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add member");
     } finally {
@@ -190,7 +193,11 @@ function AttendanceLifeGroups() {
                   >
                     <div>
                       <p className="text-lg font-bold text-[var(--color-navy)]">{group.groupName}</p>
-                      <p className="text-sm text-[var(--color-text-secondary)]">Led by {group.leaderName}</p>
+                      <p className="text-sm text-[var(--color-text-secondary)]">
+                        {group.category === "Community" ? "Community" : "Church"} Life Group · Led by{" "}
+                        {group.leaderName}
+                        {group.networkName && ` · ${group.networkName}`}
+                      </p>
                     </div>
                     <div className="hidden min-w-40 sm:block">
                       {session ? (

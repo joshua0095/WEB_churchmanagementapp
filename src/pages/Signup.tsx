@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { register } from "../api";
 import { setIsAdmin, setIsRegistrar, setModuleAccess, setToken } from "../auth";
 import { AuthLayout, Button, TextField } from "../components/ui";
+import { successToast } from "../swal";
 
 function Signup() {
   const [name, setName] = useState("");
@@ -23,6 +24,7 @@ function Signup() {
       setIsRegistrar(auth.isRegistrar);
       setModuleAccess(auth.moduleAccess);
       navigate("/", { replace: true });
+      successToast(`Welcome, ${name.trim()}!`);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed");
     } finally {

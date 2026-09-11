@@ -12,7 +12,7 @@ import {
   TextField,
 } from "./ui";
 import { BackIcon, CheckIcon } from "./ui/icons";
-import { confirmDialog } from "../swal";
+import { confirmDialog, successToast } from "../swal";
 
 function toTimeInputValue(iso: string): string {
   const d = new Date(iso);
@@ -121,6 +121,7 @@ function AttendanceRosterScreen({
       await onEditTime(recordId, combineDateAndTime(date, timeInput));
       setEditingRecordId(null);
       await reload();
+      successToast("Check-in time updated");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to update time");
     }
@@ -134,6 +135,7 @@ function AttendanceRosterScreen({
       setWalkInName("");
       setWalkInOpen(false);
       await reload();
+      successToast("Walk-in added");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add walk-in");
     } finally {

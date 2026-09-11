@@ -19,7 +19,7 @@ import {
   VersePicker,
 } from "../components/ui";
 import { StarIcon } from "../components/ui/icons";
-import { confirmDialog } from "../swal";
+import { confirmDialog, errorToast, successToast } from "../swal";
 
 interface Devo {
   id: number;
@@ -158,8 +158,6 @@ function Devotion() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const [banner, setBanner] = useState<string | null>(null);
-
   const loadDevotions = async () => {
     setLoading(true);
     setLoadError(null);
@@ -175,12 +173,6 @@ function Devotion() {
   useEffect(() => {
     loadDevotions();
   }, []);
-
-  useEffect(() => {
-    if (!banner) return;
-    const t = setTimeout(() => setBanner(null), 4000);
-    return () => clearTimeout(t);
-  }, [banner]);
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -300,13 +292,15 @@ function Devotion() {
     try {
       if (modal?.mode === "add") {
         await createDevotion(payload);
+        successToast("Devotion added");
       } else if (modal?.mode === "edit" && modal.devo) {
         await updateDevotion(modal.devo.id, payload);
+        successToast("Devotion updated");
       }
       await loadDevotions();
       closeModal();
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : "Failed to save devotion.");
+      errorToast(err instanceof Error ? err.message : "Failed to save devotion.");
     } finally {
       setSaving(false);
     }
@@ -324,8 +318,9 @@ function Devotion() {
         notes: devo.notes,
       });
       await loadDevotions();
+      successToast("Devotion duplicated");
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : "Failed to duplicate devotion.");
+      errorToast(err instanceof Error ? err.message : "Failed to duplicate devotion.");
     }
   };
 
@@ -335,8 +330,9 @@ function Devotion() {
     try {
       await deleteDevotion(id);
       await loadDevotions();
+      successToast("Devotion deleted");
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : "Failed to delete devotion.");
+      errorToast(err instanceof Error ? err.message : "Failed to delete devotion.");
     }
   };
 
@@ -348,9 +344,9 @@ function Devotion() {
         content: null,
         imageDataUrl: null,
       });
-      setBanner(`Shared "${devo.verse}" to Announcements.`);
+      successToast(`Shared "${devo.verse}" to Announcements.`);
     } catch (err) {
-      setBanner(err instanceof Error ? err.message : "Failed to share to Announcements.");
+      errorToast(err instanceof Error ? err.message : "Failed to share to Announcements.");
     }
   };
 
@@ -362,12 +358,6 @@ function Devotion() {
           + Add Devotion
         </Button>
       </div>
-
-      {banner && (
-        <div className="mb-4 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-4 py-2.5 text-sm text-[var(--color-text-primary)] shadow-[var(--shadow-card)]">
-          {banner}
-        </div>
-      )}
 
       <div className="mb-5 flex flex-col gap-4">
         <input

@@ -235,6 +235,8 @@ export async function deleteUser(id: number | string): Promise<void> {
 export interface Network {
   id: number;
   name: string;
+  /** Null for a top-level (macro) network; otherwise the id of the macro network this sub-network belongs under. */
+  parentNetworkId: number | null;
 }
 
 export interface Ministry {
@@ -245,6 +247,7 @@ export interface Ministry {
 
 export interface NetworkRequest {
   name: string;
+  parentNetworkId: number | null;
 }
 
 export interface MinistryRequest {
@@ -495,15 +498,24 @@ export async function deleteDevotion(id: number): Promise<void> {
 
 // ---------- Attendance (Workers / Congregation) ----------
 
+export type RosterScope = "Both" | "Workers" | "Congregation";
+
 export interface AttendanceEvent {
   id: number;
   name: string;
+  /** When true, attendance for this event can only be taken for a Sunday date. */
+  sundayOnly: boolean;
+  /** Which named check-in roster(s) this event's Roster-tracked sessions accept. */
+  rosterScope: RosterScope;
 }
+
+export type AttendanceTrackingType = "Headcount" | "Roster";
 
 export interface AttendanceSessionInfo {
   id: number;
   eventId: number;
   date: string;
+  trackingType: AttendanceTrackingType;
 }
 
 export type PersonType = "Worker" | "Attendee";
@@ -529,10 +541,36 @@ export async function getAttendanceEvents(): Promise<AttendanceEvent[]> {
   return res.json();
 }
 
-export async function openAttendanceSession(eventId: number, date: string): Promise<AttendanceSessionInfo> {
+export async function setEventSundayOnly(eventId: number, sundayOnly: boolean): Promise<AttendanceEvent> {
+  const res = await apiFetch(`/api/attendance/events/${eventId}/sunday-only`, {
+    method: "PUT",
+    body: JSON.stringify({ sundayOnly }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update event (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function setEventRosterScope(eventId: number, rosterScope: RosterScope): Promise<AttendanceEvent> {
+  const res = await apiFetch(`/api/attendance/events/${eventId}/roster-scope`, {
+    method: "PUT",
+    body: JSON.stringify({ rosterScope }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update event (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function openAttendanceSession(
+  eventId: number,
+  date: string,
+  trackingType?: AttendanceTrackingType,
+): Promise<AttendanceSessionInfo> {
   const res = await apiFetch("/api/attendance/sessions", {
     method: "POST",
-    body: JSON.stringify({ eventId, date }),
+    body: JSON.stringify({ eventId, date, ...(trackingType ? { trackingType } : {}) }),
   });
   if (!res.ok) {
     throw new Error((await res.text()) || `Failed to open session (${res.status})`);
@@ -636,13 +674,84 @@ export async function getAttendanceTrend(eventId: number): Promise<AttendanceTre
   return res.json();
 }
 
+// ---------- Headcount ----------
+
+export type HeadcountCategory = "Adults" | "Youth" | "Kids";
+
+export interface HeadcountEntryRow {
+  category: HeadcountCategory;
+  count: number;
+}
+
+export interface HeadcountSummary {
+  entries: HeadcountEntryRow[];
+  total: number;
+}
+
+export async function submitHeadcount(sessionId: number, entries: HeadcountEntryRow[]): Promise<HeadcountSummary> {
+  const res = await apiFetch(`/api/attendance/sessions/${sessionId}/headcount`, {
+    method: "PUT",
+    body: JSON.stringify({ entries }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to submit headcount (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getHeadcount(sessionId: number): Promise<HeadcountSummary> {
+  const res = await apiFetch(`/api/attendance/sessions/${sessionId}/headcount`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch headcount (${res.status})`);
+  }
+  return res.json();
+}
+
+// ---------- Visitor classification / retention ----------
+
+export interface PersonAttendanceStatus {
+  status: string;
+  firstVisitDate: string | null;
+  lastVisitDate: string | null;
+  totalVisits: number;
+  visitsLast8Weeks: number;
+}
+
+export async function getPersonAttendanceStatus(congregationMemberId: number): Promise<PersonAttendanceStatus> {
+  const res = await apiFetch(`/api/attendance/people/${congregationMemberId}/status`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch attendance status (${res.status})`);
+  }
+  return res.json();
+}
+
+export interface RetentionReport {
+  firstTimersInCohort: number;
+  returnedWithinWindow: number;
+  retentionRatePct: number | null;
+}
+
+export async function getRetentionReport(cohortDate: string, windowWeeks: number): Promise<RetentionReport> {
+  const params = new URLSearchParams({ cohortDate, windowWeeks: String(windowWeeks) });
+  const res = await apiFetch(`/api/attendance/report/retention?${params}`);
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to fetch retention report (${res.status})`);
+  }
+  return res.json();
+}
+
 // ---------- Life Groups ----------
+
+export type LifeGroupCategory = "Church" | "Community";
 
 export interface LifeGroupSummary {
   id: number;
   groupName: string;
   leaderId: number;
   leaderName: string;
+  networkId: number | null;
+  networkName: string | null;
+  category: LifeGroupCategory;
   memberCount: number;
 }
 
@@ -663,7 +772,17 @@ export interface LifeGroupDetail {
   groupName: string;
   leaderId: number;
   leaderName: string;
+  networkId: number | null;
+  networkName: string | null;
+  category: LifeGroupCategory;
   members: LifeGroupMember[];
+}
+
+export interface LifeGroupRequest {
+  leaderId: number;
+  groupName: string;
+  networkId: number | null;
+  category: LifeGroupCategory;
 }
 
 export interface LifeGroupSessionInfo {
@@ -711,13 +830,28 @@ export async function getLifeGroups(): Promise<LifeGroupSummary[]> {
   return res.json();
 }
 
-export async function createLifeGroup(leaderId: number, groupName: string): Promise<LifeGroup> {
+export async function createLifeGroup(
+  leaderId: number,
+  groupName: string,
+  options?: { networkId?: number | null; category?: LifeGroupCategory },
+): Promise<LifeGroup> {
   const res = await apiFetch("/api/lifegroups", {
     method: "POST",
-    body: JSON.stringify({ leaderId, groupName }),
+    body: JSON.stringify({ leaderId, groupName, ...options }),
   });
   if (!res.ok) {
     throw new Error((await res.text()) || `Failed to create life group (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function updateLifeGroup(id: number, request: LifeGroupRequest): Promise<LifeGroup> {
+  const res = await apiFetch(`/api/lifegroups/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update life group (${res.status})`);
   }
   return res.json();
 }

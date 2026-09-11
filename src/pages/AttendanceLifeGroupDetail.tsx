@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   addLifeGroupMember,
   getLifeGroup,
@@ -14,6 +14,7 @@ import { isAdmin, isRegistrar } from "../auth";
 import LifeGroupMemberList from "../components/LifeGroupMemberList";
 import { AppShell, Button, IconButton, Modal, ProfileMenu, ProgressBar, Skeleton, TextField } from "../components/ui";
 import { BackIcon } from "../components/ui/icons";
+import { successToast } from "../swal";
 
 function todayIso(): string {
   const d = new Date();
@@ -27,8 +28,9 @@ function AttendanceLifeGroupDetail() {
   const { id } = useParams();
   const groupId = Number(id);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const overseer = isAdmin() || isRegistrar();
-  const date = todayIso();
+  const date = searchParams.get("date") ?? todayIso();
 
   const [group, setGroup] = useState<LifeGroupDetail | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
@@ -63,7 +65,7 @@ function AttendanceLifeGroupDetail() {
   useEffect(() => {
     if (groupId) load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [groupId]);
+  }, [groupId, date]);
 
   const refreshRoster = async () => {
     if (sessionId === null) return;
@@ -78,6 +80,7 @@ function AttendanceLifeGroupDetail() {
       setNewMemberName("");
       setAddMemberOpen(false);
       await refreshRoster();
+      successToast("Member added");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to add member");
     } finally {
@@ -105,19 +108,21 @@ function AttendanceLifeGroupDetail() {
     <AppShell headerRight={<ProfileMenu />}>
       <div className="mb-6 flex items-start justify-between gap-4">
         <div className="flex items-start gap-4">
-          {overseer && (
-            <IconButton
-              aria-label="Back to Life Groups"
-              onClick={() => navigate("/attendance/lifegroups")}
-              className="mt-1 !h-11 !w-11 border border-[var(--color-border)] !text-[var(--color-navy)]"
-            >
-              <BackIcon />
-            </IconButton>
-          )}
+          <IconButton
+            aria-label={overseer ? "Back to Life Groups" : "Back to Attendance"}
+            onClick={() => navigate(overseer ? "/attendance/lifegroups" : "/attendance")}
+            className="mt-1 !h-11 !w-11 border border-[var(--color-border)] !text-[var(--color-navy)]"
+          >
+            <BackIcon />
+          </IconButton>
           <div>
             <h1 className="font-display text-2xl font-bold text-[var(--color-navy)]">{group.groupName}</h1>
             <p className="mt-1 text-base font-semibold text-[var(--color-text-secondary)]">
               Week {weekNumber} — {date}
+            </p>
+            <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
+              {group.category === "Community" ? "Community" : "Church"} Life Group · Led by {group.leaderName}
+              {group.networkName && ` · ${group.networkName}`}
             </p>
           </div>
         </div>

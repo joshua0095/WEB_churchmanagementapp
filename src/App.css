@@ -1,90 +1,97 @@
-.page {
-  max-width: 1040px;
-  width: 100%;
-  margin: 0 auto;
-  padding: 2rem 1.25rem 3rem;
-}
-
-@media (min-width: 900px) {
+/* Wrapped in the `components` layer (see index.css's `@layer theme, components,
+   utilities;` order declaration) so a Tailwind utility combined with one of these
+   classes always wins, matching the intended "base style + override" pattern —
+   without this, these unlayered rules would beat layered Tailwind utilities
+   regardless of specificity or class order, per the CSS cascade layers spec. */
+@layer components {
   .page {
-    padding: 2.5rem 2rem 3rem;
+    max-width: 1040px;
+    width: 100%;
+    margin: 0 auto;
+    padding: 2rem 1.25rem 3rem;
   }
-}
 
-.page-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
+  @media (min-width: 900px) {
+    .page {
+      padding: 2.5rem 2rem 3rem;
+    }
+  }
 
-.page-header h1 {
-  font-size: 1.4rem;
-}
+  .page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
 
-.page-sections {
-  display: flex;
-  flex-direction: column;
-  gap: 1.5rem;
-}
-@media (min-width: 900px) {
+  .page-header h1 {
+    font-size: 1.4rem;
+  }
+
   .page-sections {
-    display: grid;
-    grid-template-columns: minmax(280px, 380px) 1fr;
-    align-items: start;
-  }
-}
-
-.section-title {
-  font-size: 1rem;
-  font-weight: 800;
-  margin: 0 0 1rem;
-  color: var(--color-text-primary);
-}
-
-.user-form {
-  display: flex;
-  flex-direction: column;
-  gap: 0.9rem;
-}
-
-.error {
-  color: var(--color-danger);
-  font-size: 0.85rem;
-  margin: 0;
-}
-
-.helper-text {
-  color: var(--color-text-secondary);
-  font-size: 0.9rem;
-  margin: 0;
-}
-
-/* ---------- Home ---------- */
-.home {
-  display: flex;
-  flex-direction: column;
-  gap: 1.75rem;
-}
-
-.welcome {
-  font-size: 1.25rem;
-  margin: 0;
-}
-
-.home-highlights {
-  display: flex;
-  flex-direction: column;
-  gap: 1.75rem;
-}
-@media (min-width: 900px) {
-  .home-highlights {
-    display: grid;
-    grid-template-columns: 1.3fr 1fr;
+    display: flex;
+    flex-direction: column;
     gap: 1.5rem;
   }
-}
+  @media (min-width: 900px) {
+    .page-sections {
+      display: grid;
+      grid-template-columns: minmax(280px, 380px) 1fr;
+      align-items: start;
+    }
+  }
 
-/* The Devotion page is implemented with Tailwind utility classes
-   directly in Devotion.tsx — no rules needed here. */
+  .section-title {
+    font-size: 1rem;
+    font-weight: 800;
+    margin: 0 0 1rem;
+    color: var(--color-text-primary);
+  }
+
+  .user-form {
+    display: flex;
+    flex-direction: column;
+    gap: 0.9rem;
+  }
+
+  .error {
+    color: var(--color-danger);
+    font-size: 0.85rem;
+    margin: 0;
+  }
+
+  .helper-text {
+    color: var(--color-text-secondary);
+    font-size: 0.9rem;
+    margin: 0;
+  }
+
+  /* ---------- Home ---------- */
+  .home {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+  }
+
+  .welcome {
+    font-size: 1.25rem;
+    margin: 0;
+  }
+
+  .home-highlights {
+    display: flex;
+    flex-direction: column;
+    gap: 1.75rem;
+  }
+  @media (min-width: 900px) {
+    .home-highlights {
+      display: grid;
+      grid-template-columns: 1.3fr 1fr;
+      gap: 1.5rem;
+    }
+  }
+
+  /* The Devotion page is implemented with Tailwind utility classes
+     directly in Devotion.tsx — no rules needed here. */
+}

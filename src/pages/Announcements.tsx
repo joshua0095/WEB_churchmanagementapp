@@ -16,7 +16,7 @@ import {
   SkeletonListRow,
   TextField,
 } from "../components/ui";
-import { confirmDialog, infoAlert } from "../swal";
+import { confirmDialog, infoAlert, successToast } from "../swal";
 
 const ASPECT_RATIO = 16 / 9;
 const ASPECT_TOLERANCE = 0.02;
@@ -112,6 +112,7 @@ function Announcements() {
       await createAnnouncement({ eyebrow, title, content, imageDataUrl });
       resetForm();
       await loadAnnouncements();
+      successToast("Announcement added");
     } catch (err) {
       setFormError(err instanceof Error ? err.message : "Failed to add announcement");
     } finally {
@@ -123,6 +124,7 @@ function Announcements() {
     try {
       await deleteAnnouncement(id);
       await loadAnnouncements();
+      successToast("Announcement deleted");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to delete announcement");
     }

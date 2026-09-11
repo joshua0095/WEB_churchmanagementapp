@@ -2,12 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import {
   getAttendanceEvents,
   getCongregationBreakdown,
+  getRetentionReport,
   type AttendanceEvent,
   type CongregationBreakdownReport,
   type CongregationBreakdownRow,
+  type RetentionReport,
 } from "../api";
 import { isAdmin, isRegistrar } from "../auth";
-import { AppShell, Card, ProfileMenu, SelectField, Skeleton } from "../components/ui";
+import { AppShell, Card, FilterBar, ProfileMenu, SelectField, Skeleton, TextField } from "../components/ui";
 
 function currentYearMonth(): { year: number; month: number } {
   const now = new Date();
@@ -82,6 +84,14 @@ function BreakdownTable({
   );
 }
 
+function todayIso(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function Reports() {
   const overseer = isAdmin() || isRegistrar();
 
@@ -94,6 +104,12 @@ function Reports() {
   const [report, setReport] = useState<CongregationBreakdownReport | null>(null);
   const [loading, setLoading] = useState(overseer);
   const [error, setError] = useState<string | null>(null);
+
+  const [cohortDate, setCohortDate] = useState(todayIso());
+  const [windowWeeks, setWindowWeeks] = useState(2);
+  const [retention, setRetention] = useState<RetentionReport | null>(null);
+  const [loadingRetention, setLoadingRetention] = useState(overseer);
+  const [retentionError, setRetentionError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!overseer) return;
@@ -119,6 +135,16 @@ function Reports() {
 
   const monthValue = useMemo(() => `${year}-${String(month).padStart(2, "0")}`, [year, month]);
 
+  useEffect(() => {
+    if (!overseer || !cohortDate) return;
+    setLoadingRetention(true);
+    setRetentionError(null);
+    getRetentionReport(cohortDate, windowWeeks)
+      .then(setRetention)
+      .catch((err) => setRetentionError(err instanceof Error ? err.message : "Failed to load retention report"))
+      .finally(() => setLoadingRetention(false));
+  }, [overseer, cohortDate, windowWeeks]);
+
   if (!overseer) {
     return (
       <AppShell headerRight={<ProfileMenu />}>
@@ -136,19 +162,23 @@ function Reports() {
         <h1>Reports</h1>
       </div>
 
-      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end">
-        <SelectField
-          label="Event"
-          value={selectedEventId ?? ""}
-          onChange={(e) => setSelectedEventId(Number(e.target.value))}
-          className="sm:max-w-[280px]"
-        >
-          {events.map((ev) => (
-            <option key={ev.id} value={ev.id}>
-              {ev.name}
-            </option>
-          ))}
-        </SelectField>
+      <FilterBar
+        primary={
+          <SelectField
+            label="Event"
+            value={selectedEventId ?? ""}
+            onChange={(e) => setSelectedEventId(Number(e.target.value))}
+            className="sm:max-w-[280px]"
+          >
+            {events.map((ev) => (
+              <option key={ev.id} value={ev.id}>
+                {ev.name}
+              </option>
+            ))}
+          </SelectField>
+        }
+        className="mb-6"
+      >
         <label className="ui-field sm:max-w-[200px]">
           <span className="ui-field-label">Month</span>
           <input
@@ -164,9 +194,61 @@ function Reports() {
             }}
           />
         </label>
-      </div>
+      </FilterBar>
 
       {error && <p className="error mb-4">{error}</p>}
+
+      <Card className="mb-6 flex flex-col gap-4">
+        <p className="section-title">Retention — first-timers who came back</p>
+        <p className="helper-text">
+          Of everyone whose very first visit fell on the chosen date, what share came back within the window.
+        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+          <TextField
+            label="First-timer date"
+            type="date"
+            value={cohortDate}
+            onChange={(e) => setCohortDate(e.target.value)}
+            className="sm:max-w-[220px]"
+          />
+          <SelectField
+            label="Window"
+            value={windowWeeks}
+            onChange={(e) => setWindowWeeks(Number(e.target.value))}
+            className="sm:max-w-[160px]"
+          >
+            <option value={1}>1 week</option>
+            <option value={2}>2 weeks</option>
+            <option value={3}>3 weeks</option>
+            <option value={4}>4 weeks</option>
+          </SelectField>
+        </div>
+
+        {retentionError && <p className="error">{retentionError}</p>}
+
+        {loadingRetention ? (
+          <Skeleton className="h-16 w-full max-w-sm rounded-md" />
+        ) : retention && retention.firstTimersInCohort === 0 ? (
+          <p className="helper-text">No one's very first visit fell on that date.</p>
+        ) : (
+          retention && (
+            <div className="flex flex-wrap gap-8">
+              <div>
+                <p className="text-2xl font-bold text-[var(--color-navy)]">{retention.firstTimersInCohort}</p>
+                <p className="text-sm text-[var(--color-text-secondary)]">First-timers that week</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-[var(--color-navy)]">{retention.returnedWithinWindow}</p>
+                <p className="text-sm text-[var(--color-text-secondary)]">Returned within the window</p>
+              </div>
+              <div>
+                <p className="text-2xl font-bold text-[var(--color-navy)]">{retention.retentionRatePct}%</p>
+                <p className="text-sm text-[var(--color-text-secondary)]">Retention rate</p>
+              </div>
+            </div>
+          )
+        )}
+      </Card>
 
       {loading ? (
         <div className="flex flex-col gap-4">

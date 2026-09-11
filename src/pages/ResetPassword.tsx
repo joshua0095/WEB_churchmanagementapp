@@ -3,6 +3,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { confirmPasswordReset } from "../api";
 import { setIsAdmin, setIsRegistrar, setModuleAccess, setToken } from "../auth";
 import { AuthLayout, Button, TextField } from "../components/ui";
+import { successToast } from "../swal";
 
 function ResetPassword() {
   const [searchParams] = useSearchParams();
@@ -25,6 +26,7 @@ function ResetPassword() {
       setIsRegistrar(auth.isRegistrar);
       setModuleAccess(auth.moduleAccess);
       navigate("/", { replace: true });
+      successToast("Password reset — you're logged in");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Reset failed");
     } finally {

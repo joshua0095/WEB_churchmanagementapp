@@ -1,6 +1,17 @@
 /* Theme + utilities only — preflight is skipped so Tailwind doesn't
    reset the hand-authored base styles below (body/heading/list resets
-   already live in this file and in theme.css/ui.css). */
+   already live in this file and in theme.css/ui.css).
+
+   Layer order is declared up front so a Tailwind utility always wins over a
+   hand-authored component class it's combined with (e.g. `helper-text mb-4`) —
+   per the CSS cascade layers spec, an unlayered rule beats every layered one
+   regardless of source order, so App.css is layered as `components` for this.
+   ui.css stays unlayered: it contains the .jil-datepicker overrides that must
+   beat react-day-picker's own unlayered stylesheet, and a named layer can never
+   win against unlayered CSS no matter its specificity — layering ui.css would
+   make those overrides lose to the library's base styles. */
+@layer theme, components, utilities;
+
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
 
@@ -107,4 +118,32 @@ button {
 .swal2-icon.swal2-info {
   border-color: var(--color-info) !important;
   color: var(--color-info) !important;
+}
+.swal2-icon.swal2-success {
+  border-color: var(--color-success) !important;
+  color: var(--color-success) !important;
+}
+.swal2-icon.swal2-success [class^="swal2-success-line"] {
+  background-color: var(--color-success) !important;
+}
+.swal2-icon.swal2-success .swal2-success-ring {
+  border-color: color-mix(in srgb, var(--color-success) 30%, transparent) !important;
+}
+.swal2-icon.swal2-error {
+  border-color: var(--color-danger) !important;
+  color: var(--color-danger) !important;
+}
+.swal2-icon.swal2-error [class^="swal2-x-mark-line"] {
+  background-color: var(--color-danger) !important;
+}
+/* Toast variant (see successToast/errorToast in swal.ts) — smaller and top-right,
+   so the heavier popup shadow/border-radius above would look oversized here. */
+.swal2-toast {
+  border-radius: var(--radius-md) !important;
+  box-shadow: var(--shadow-card) !important;
+}
+.swal2-toast .swal2-title {
+  font-family: var(--font-sans) !important;
+  font-size: 0.95rem !important;
+  font-weight: 600 !important;
 }

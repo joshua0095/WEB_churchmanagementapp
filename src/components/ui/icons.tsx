@@ -6,6 +6,7 @@ import {
   ArrowRightToBracket,
   Bars,
   Bullhorn,
+  CalendarMonth,
   ChartMixed,
   Check,
   ChevronDown,
@@ -17,6 +18,7 @@ import {
   ExclamationCircle,
   Eye,
   EyeSlash,
+  Filter,
   Home,
   Pen,
   Search,
@@ -43,6 +45,7 @@ export const CloseIcon = Close;
 export const StarIcon = Star;
 export const SettingsIcon = Cog;
 export const AttendanceIcon = ClipboardCheck;
+export const HeadcountIcon = ChartMixed;
 export const CheckIcon = Check;
 export const ClockIcon = Clock;
 export const LifeGroupIcon = UsersGroup;
@@ -50,3 +53,5 @@ export const ChevronDownIcon = ChevronDown;
 export const ShowPasswordIcon = Eye;
 export const HidePasswordIcon = EyeSlash;
 export const ErrorIcon = ExclamationCircle;
+export const FilterIcon = Filter;
+export const CalendarIcon = CalendarMonth;

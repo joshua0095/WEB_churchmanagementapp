@@ -49,3 +49,25 @@ export async function infoAlert(message: string, title?: string): Promise<void> 
     confirmButtonColor: GOLD,
   });
 }
+
+const toastSwal = Swal.mixin({
+  toast: true,
+  position: "top-end",
+  showConfirmButton: false,
+  timer: 3000,
+  timerProgressBar: true,
+  didOpen: (el) => {
+    el.addEventListener("mouseenter", Swal.stopTimer);
+    el.addEventListener("mouseleave", Swal.resumeTimer);
+  },
+});
+
+/** Brief, non-blocking confirmation for a completed action — top-right, auto-dismisses. */
+export function successToast(message: string): void {
+  void toastSwal.fire({ icon: "success", title: message });
+}
+
+/** Brief, non-blocking failure notice — top-right, auto-dismisses (use infoAlert instead for errors that need to stay on screen until dismissed). */
+export function errorToast(message: string): void {
+  void toastSwal.fire({ icon: "error", title: message });
+}

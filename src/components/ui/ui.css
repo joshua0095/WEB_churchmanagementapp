@@ -81,10 +81,34 @@
   background: var(--color-border);
 }
 .auth-card .ui-field-adornment button {
-  color: #c9d6e5;
+  color: var(--color-gold);
 }
 .auth-card .ui-field-adornment button:hover {
-  color: #fff;
+  color: var(--color-gold-hover);
+}
+
+/* ---------- Date picker ---------- */
+/* Themes react-day-picker via its documented CSS custom properties instead of
+   overriding its class names, so an upgrade of the library can't silently drop styling. */
+.jil-datepicker .rdp-root {
+  --rdp-accent-color: var(--color-navy);
+  --rdp-accent-background-color: color-mix(in srgb, var(--color-navy) 10%, white);
+  --rdp-today-color: var(--color-gold-hover);
+  --rdp-outside-opacity: 0.4;
+  --rdp-disabled-opacity: 0.35;
+  font-size: 0.9rem;
+}
+.jil-datepicker .rdp-day_button:hover:not([disabled]) {
+  background: color-mix(in srgb, var(--color-navy) 8%, transparent);
+}
+.jil-datepicker .rdp-selected .rdp-day_button {
+  background: var(--color-navy);
+  color: var(--color-text-on-navy);
+}
+/* Bible Reading / WHS attendance is almost always taken for a Sunday — a subtle
+   tint makes the usual pick easy to spot at a glance among the other days. */
+.jil-datepicker .jil-datepicker-sunday:not(.rdp-selected) .rdp-day_button {
+  background: color-mix(in srgb, var(--color-gold) 15%, transparent);
 }
 
 /* ---------- App shell ---------- */
@@ -155,6 +179,40 @@
   color: #fff;
 }
 .app-sidebar-link.active {
+  background: var(--color-gold);
+  color: var(--color-text-on-gold);
+}
+
+.app-sidebar-subnav {
+  list-style: none;
+  margin: 0.15rem 0 0;
+  padding: 0 0 0 2.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.app-sidebar-sublink {
+  width: 100%;
+  display: block;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md);
+  color: #cdd9e8;
+  font-family: inherit;
+  font-size: 0.9rem;
+  font-weight: 600;
+  padding: 0.5rem 0.75rem;
+  cursor: pointer;
+  text-align: left;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease;
+}
+.app-sidebar-sublink:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+}
+.app-sidebar-sublink.active {
   background: var(--color-gold);
   color: var(--color-text-on-gold);
 }
