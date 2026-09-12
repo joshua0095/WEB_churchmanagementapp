@@ -18,6 +18,7 @@ import { InitialAvatar, formatBirthday } from "../components/PeopleShared";
 import {
   buildNetworkTree,
   flattenNetworksForSelect,
+  getAncestorNetworkIds,
   SINGLE_SELECT_PARENT_NAME,
   type NetworkTreeNode,
 } from "../components/networkTree";
@@ -39,7 +40,10 @@ import { getPageSize, setPageSize } from "../preferences";
 import { confirmDialog, infoAlert, successToast } from "../swal";
 
 const emptyUserForm = {
-  name: "",
+  firstName: "",
+  middleName: "",
+  lastName: "",
+  nickname: "",
   email: "",
   birthday: "",
   ministryIds: [] as number[],
@@ -187,7 +191,14 @@ function PeopleWorkers() {
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
     return users.filter((u) => {
-      if (q && !u.name.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q)) return false;
+      if (
+        q &&
+        !u.name.toLowerCase().includes(q) &&
+        !u.email.toLowerCase().includes(q) &&
+        !u.nickname?.toLowerCase().includes(q)
+      ) {
+        return false;
+      }
       if (ministryFilter && !u.ministryIds.includes(Number(ministryFilter))) return false;
       if (networkFilter && !u.networkIds.includes(Number(networkFilter))) return false;
       return true;
@@ -206,7 +217,10 @@ function PeopleWorkers() {
   const openEditUser = (u: User) => {
     setEditingUserId(u.id);
     setUserForm({
-      name: u.name,
+      firstName: u.firstName,
+      middleName: u.middleName ?? "",
+      lastName: u.lastName,
+      nickname: u.nickname ?? "",
       email: u.email,
       birthday: u.birthday ? u.birthday.slice(0, 10) : "",
       ministryIds: u.ministryIds,
@@ -223,37 +237,51 @@ function PeopleWorkers() {
       const ministryIds = adding ? [...f.ministryIds, id] : f.ministryIds.filter((x) => x !== id);
       if (!adding) return { ...f, ministryIds };
 
-      // Picking a ministry implies membership in its parent network too (e.g. JAM/VIA/TEAM -> WAN).
+      // Picking a ministry implies membership in its network and every network above it
+      // too (e.g. JAM/VIA/TEAM -> WAN -> MDN).
       const ministry = ministries.find((m) => m.id === id);
-      const networkIds =
-        ministry && !f.networkIds.includes(ministry.networkId) ? [...f.networkIds, ministry.networkId] : f.networkIds;
-      return { ...f, ministryIds, networkIds };
+      if (!ministry) return { ...f, ministryIds };
+      const impliedNetworkIds = [ministry.networkId, ...getAncestorNetworkIds(ministry.networkId, networks)].filter(
+        (nid) => !f.networkIds.includes(nid),
+      );
+      return { ...f, ministryIds, networkIds: [...f.networkIds, ...impliedNetworkIds] };
     });
   };
 
   const toggleNetwork = (id: number) => {
-    setUserForm((f) => ({
-      ...f,
-      networkIds: f.networkIds.includes(id) ? f.networkIds.filter((x) => x !== id) : [...f.networkIds, id],
-    }));
+    setUserForm((f) => {
+      if (f.networkIds.includes(id)) return { ...f, networkIds: f.networkIds.filter((x) => x !== id) };
+
+      // Selecting a sub-network implies membership in every network above it too (e.g. WAN -> MDN).
+      const ancestorIds = getAncestorNetworkIds(id, networks).filter((a) => !f.networkIds.includes(a));
+      return { ...f, networkIds: [...f.networkIds, id, ...ancestorIds] };
+    });
   };
 
   // LGN's sub-networks are mutually exclusive (a member belongs to exactly one demographic group),
   // so picking one replaces any other sibling already selected instead of just adding to the list.
   const selectSingleNetwork = (siblingIds: number[], id: number) => {
-    setUserForm((f) => ({
-      ...f,
-      networkIds: [...f.networkIds.filter((x) => !siblingIds.includes(x)), id],
-    }));
+    setUserForm((f) => {
+      const ancestorIds = getAncestorNetworkIds(id, networks).filter(
+        (a) => !f.networkIds.includes(a) && !siblingIds.includes(a),
+      );
+      return {
+        ...f,
+        networkIds: [...f.networkIds.filter((x) => !siblingIds.includes(x)), id, ...ancestorIds],
+      };
+    });
   };
 
   const handleSaveUser = async () => {
-    if (!userForm.name.trim() || !userForm.email.trim()) return;
+    if (!userForm.firstName.trim() || !userForm.lastName.trim() || !userForm.email.trim()) return;
     setSavingUser(true);
     setUserFormError(null);
     try {
       const payload = {
-        name: userForm.name.trim(),
+        firstName: userForm.firstName.trim(),
+        middleName: userForm.middleName.trim() || null,
+        lastName: userForm.lastName.trim(),
+        nickname: userForm.nickname.trim() || null,
         email: userForm.email.trim(),
         birthday: userForm.birthday || null,
         ministryIds: userForm.ministryIds,
@@ -266,7 +294,7 @@ function PeopleWorkers() {
         setUserModalOpen(false);
         await loadUsers();
         await infoAlert(
-          `Temporary password: ${result.temporaryPassword}\n\nShare this with ${payload.name} so they can log in. They should change it from Settings afterward.`,
+          `Temporary password: ${result.temporaryPassword}\n\nShare this with ${result.user.name} so they can log in. They should change it from Settings afterward.`,
           "Worker created",
         );
       } else {
@@ -474,7 +502,7 @@ function PeopleWorkers() {
             <Button
               type="button"
               onClick={handleSaveUser}
-              disabled={savingUser || !userForm.name.trim() || !userForm.email.trim()}
+              disabled={savingUser || !userForm.firstName.trim() || !userForm.lastName.trim() || !userForm.email.trim()}
             >
               {savingUser ? "Saving..." : editingUserId === null ? "Add worker" : "Save changes"}
             </Button>
@@ -483,10 +511,26 @@ function PeopleWorkers() {
       >
         <div className="flex flex-col gap-4">
           <TextField
-            label="Name"
-            value={userForm.name}
-            onChange={(e) => setUserForm((f) => ({ ...f, name: e.target.value }))}
+            label="First name"
+            value={userForm.firstName}
+            onChange={(e) => setUserForm((f) => ({ ...f, firstName: e.target.value }))}
             required
+          />
+          <TextField
+            label="Middle name (optional)"
+            value={userForm.middleName}
+            onChange={(e) => setUserForm((f) => ({ ...f, middleName: e.target.value }))}
+          />
+          <TextField
+            label="Last name"
+            value={userForm.lastName}
+            onChange={(e) => setUserForm((f) => ({ ...f, lastName: e.target.value }))}
+            required
+          />
+          <TextField
+            label="Nickname (optional)"
+            value={userForm.nickname}
+            onChange={(e) => setUserForm((f) => ({ ...f, nickname: e.target.value }))}
           />
           <TextField
             label="Email"

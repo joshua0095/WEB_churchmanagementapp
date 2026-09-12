@@ -2,7 +2,14 @@ import { clearToken, getToken } from "./auth";
 
 export interface User {
   id: string | number;
+  /** Computed full legal name (First [Middle] Last) — what every screen besides this
+   * person's own profile/edit form should display. */
   name: string;
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  /** Only ever shown on this person's own profile/edit view, never in place of `name`. */
+  nickname: string | null;
   email: string;
   isAdmin: boolean;
   isRegistrar: boolean;
@@ -13,7 +20,10 @@ export interface User {
 }
 
 export interface UserFormRequest {
-  name: string;
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  nickname: string | null;
   email: string;
   birthday: string | null;
   ministryIds: number[];
@@ -56,11 +66,20 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<Respon
   return res;
 }
 
-export async function register(name: string, email: string, password: string): Promise<AuthResponse> {
+export interface RegisterRequest {
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  nickname: string | null;
+  email: string;
+  password: string;
+}
+
+export async function register(payload: RegisterRequest): Promise<AuthResponse> {
   const res = await fetch(`${API_URL}/api/auth/register`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ name, email, password }),
+    body: JSON.stringify(payload),
   });
   if (!res.ok) {
     throw new Error(await res.text() || `Registration failed (${res.status})`);
@@ -161,6 +180,34 @@ export async function getChapterVerseCount(
   }
   const data: { verseCount: number } = await res.json();
   return data.verseCount;
+}
+
+export async function getMe(): Promise<User> {
+  const res = await apiFetch("/api/users/me");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch your profile (${res.status})`);
+  }
+  return res.json();
+}
+
+export interface UpdateMeRequest {
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  nickname: string | null;
+  email: string;
+  birthday: string | null;
+}
+
+export async function updateMe(profile: UpdateMeRequest): Promise<User> {
+  const res = await apiFetch("/api/users/me", {
+    method: "PUT",
+    body: JSON.stringify(profile),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update your profile (${res.status})`);
+  }
+  return res.json();
 }
 
 export async function getUsers(): Promise<User[]> {
@@ -335,7 +382,14 @@ export type Gender = "Male" | "Female";
 
 export interface CongregationMember {
   id: number;
+  /** Computed full legal name (First [Middle] Last) — what every screen besides this
+   * person's own edit form should display. */
   name: string;
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  /** Only ever shown on this person's own edit view, never in place of `name`. */
+  nickname: string | null;
   birthday: string | null;
   gender: Gender | null;
   createdAt: string;
@@ -344,7 +398,10 @@ export interface CongregationMember {
 }
 
 export interface CongregationMemberRequest {
-  name: string;
+  firstName: string;
+  middleName: string | null;
+  lastName: string;
+  nickname: string | null;
   birthday: string | null;
   gender: Gender | null;
   oldCategory: string | null;
@@ -759,6 +816,7 @@ export interface LifeGroup {
   id: number;
   leaderId: number;
   groupName: string;
+  category: LifeGroupCategory;
 }
 
 export interface LifeGroupMember {
@@ -811,6 +869,96 @@ export interface LifeGroupTrendPoint {
   date: string;
   checkedIn: number;
   total: number;
+}
+
+// Church Life Groups don't track attendance by a freely-chosen date — it's always framed
+// as "the Nth week of this month" (1st..4th/5th), picked from a week dropdown rather than
+// a calendar. A Community group instead picks any calendar date directly (see DatePicker).
+function ordinalSuffix(n: number): string {
+  return n === 1 ? "st" : n === 2 ? "nd" : n === 3 ? "rd" : "th";
+}
+
+export function ordinalWeekLabel(week: number): string {
+  return `${week}${ordinalSuffix(week)} week`;
+}
+
+function daysInCalendarMonth(y: number, m: number): number {
+  return new Date(y, m, 0).getDate();
+}
+
+// The day-of-month of every Sunday in the month — a Church Life Group's "week" is
+// literally counted by Sundays (a month always has exactly 4 or 5), not by calendar-week
+// rows or a plain days/7 count.
+function sundaysInMonth(y: number, m: number): number[] {
+  const total = daysInCalendarMonth(y, m);
+  const days: number[] = [];
+  for (let d = 1; d <= total; d++) {
+    if (new Date(y, m - 1, d).getDay() === 0) days.push(d);
+  }
+  return days;
+}
+
+// Which Sunday's week a date falls in — a date before the month's first Sunday still
+// counts as week 1, and a date after the last Sunday stays in that last week.
+export function weekNumberOfMonth(iso: string): number {
+  const [y, m, d] = iso.split("-").map(Number);
+  const sundays = sundaysInMonth(y, m);
+  let week = 1;
+  for (let i = 0; i < sundays.length; i++) {
+    if (sundays[i] <= d) week = i + 1;
+  }
+  return week;
+}
+
+export function weekOfMonthLabel(iso: string): string {
+  return ordinalWeekLabel(weekNumberOfMonth(iso));
+}
+
+export function formatLifeGroupDate(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "short", day: "numeric" });
+}
+
+// The number of Sundays in the month — always 4 or 5, and genuinely varies month to
+// month based on which weekday the 1st lands on.
+export function weeksInMonth(iso: string): number {
+  const [y, m] = iso.split("-").map(Number);
+  return sundaysInMonth(y, m).length;
+}
+
+// A week-of-month number maps directly to that Sunday's date — Church attendance is
+// always logged for the Sunday itself.
+export function dateForWeekOfMonth(iso: string, week: number): string {
+  const [y, m] = iso.split("-").map(Number);
+  const sundays = sundaysInMonth(y, m);
+  const day = sundays[Math.min(Math.max(week, 1), sundays.length) - 1];
+  const d = new Date(y, m - 1, day);
+  const yy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, "0");
+  const dd = String(d.getDate()).padStart(2, "0");
+  return `${yy}-${mm}-${dd}`;
+}
+
+// Snaps any date to the Sunday of the week it falls in — used so a Church group's
+// session is always keyed by that Sunday, even before a leader has touched the picker.
+export function currentChurchSessionDate(iso: string): string {
+  return dateForWeekOfMonth(iso, weekNumberOfMonth(iso));
+}
+
+export function monthLabel(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", { month: "long", year: "numeric" });
+}
+
+// Moves a reference date to another month, keeping the same week-of-month number
+// (clamped to however many weeks the target month has) — this is how a Church group's
+// month stepper changes month while the week dropdown's options update to match.
+export function shiftMonth(iso: string, delta: number): string {
+  const [y, m] = iso.split("-").map(Number);
+  const totalMonths = y * 12 + (m - 1) + delta;
+  const targetY = Math.floor(totalMonths / 12);
+  const targetM = (totalMonths % 12) + 1;
+  const targetFirst = `${targetY}-${String(targetM).padStart(2, "0")}-01`;
+  const week = Math.min(weekNumberOfMonth(iso), weeksInMonth(targetFirst));
+  return dateForWeekOfMonth(targetFirst, week);
 }
 
 export async function getLifeGroupsSummary(date: string): Promise<{ total: number; checkedInCount: number }> {

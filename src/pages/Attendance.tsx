@@ -60,8 +60,9 @@ function Attendance() {
   const [accessError, setAccessError] = useState<string | null>(null);
 
   const [myGroups, setMyGroups] = useState<LifeGroup[]>([]);
-  const [leaderStep, setLeaderStep] = useState<"date" | "group">("date");
+  const [leaderStep, setLeaderStep] = useState<"date" | "group">("group");
   const [leaderDate, setLeaderDate] = useState(todayIso());
+  const [dateStepGroupId, setDateStepGroupId] = useState<number | null>(null);
 
   const [events, setEvents] = useState<AttendanceEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -86,6 +87,17 @@ function Attendance() {
           setAccessError("You don't have access to Attendance.");
         } else {
           setMyGroups(groups);
+          // A single group skips straight to the date step (if choosable) or straight
+          // to today's session — no need to make the leader pick a group of one.
+          if (groups.length === 1) {
+            const only = groups[0];
+            if (only.category === "Community") {
+              setDateStepGroupId(only.id);
+              setLeaderStep("date");
+            } else {
+              navigate(`/attendance/lifegroups/${only.id}`);
+            }
+          }
         }
         setCheckingAccess(false);
       })
@@ -93,6 +105,7 @@ function Attendance() {
         setAccessError(err instanceof Error ? err.message : "Failed to load your life groups");
         setCheckingAccess(false);
       });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overseer]);
 
   useEffect(() => {
@@ -164,12 +177,22 @@ function Attendance() {
   }
 
   if (!overseer) {
+    // Church Life Groups always take attendance for the current week — no date to
+    // pick. Community Life Groups can log attendance for any date, so leaders of
+    // those groups get the date step; the resulting week label is derived from it.
+    const chooseGroup = (group: LifeGroup) => {
+      if (group.category === "Community") {
+        setDateStepGroupId(group.id);
+        setLeaderStep("date");
+      } else {
+        navigate(`/attendance/lifegroups/${group.id}`);
+      }
+    };
+
     const confirmLeaderDate = (iso: string) => {
       setLeaderDate(iso);
-      if (myGroups.length === 1) {
-        navigate(`/attendance/lifegroups/${myGroups[0].id}?date=${iso}`);
-      } else {
-        setLeaderStep("group");
+      if (dateStepGroupId !== null) {
+        navigate(`/attendance/lifegroups/${dateStepGroupId}?date=${iso}`);
       }
     };
 
@@ -181,6 +204,15 @@ function Attendance() {
 
         {leaderStep === "date" && (
           <>
+            {myGroups.length > 1 && (
+              <button
+                type="button"
+                onClick={() => setLeaderStep("group")}
+                className="mb-4 flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-sm font-bold text-[var(--color-text-secondary)] hover:text-[var(--color-navy)]"
+              >
+                <BackIcon className="h-4 w-4" /> Change group
+              </button>
+            )}
             <p className="helper-text mb-4">Tap the date this attendance is for.</p>
             <div className="flex justify-center">
               <DatePicker inline value={leaderDate} onChange={confirmLeaderDate} />
@@ -190,20 +222,13 @@ function Attendance() {
 
         {leaderStep === "group" && (
           <>
-            <button
-              type="button"
-              onClick={() => setLeaderStep("date")}
-              className="mb-4 flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-sm font-bold text-[var(--color-text-secondary)] hover:text-[var(--color-navy)]"
-            >
-              <BackIcon className="h-4 w-4" /> Change date
-            </button>
             <p className="helper-text mb-4">Choose which Life Group to take attendance for.</p>
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {myGroups.map((group) => (
                 <button
                   key={group.id}
                   type="button"
-                  onClick={() => navigate(`/attendance/lifegroups/${group.id}?date=${leaderDate}`)}
+                  onClick={() => chooseGroup(group)}
                   className="cursor-pointer border-0 bg-transparent p-0 text-left"
                 >
                   <Card className="flex items-center gap-3 !p-5">

@@ -4,7 +4,8 @@ import { clearToken } from "../../auth";
 import IconButton from "./IconButton";
 import { LogoutIcon, ProfileIcon } from "./icons";
 
-/** Profile button in the top bar; opens a small menu with sign-out. */
+/** Profile button in the top bar; opens a small menu linking to the full Profile page
+ * (your own details, editable) and sign-out. */
 function ProfileMenu() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -31,6 +32,18 @@ function ProfileMenu() {
       </IconButton>
       {open && (
         <div className="profile-menu-dropdown" role="menu">
+          <button
+            type="button"
+            className="profile-menu-item"
+            role="menuitem"
+            onClick={() => {
+              setOpen(false);
+              navigate("/profile");
+            }}
+          >
+            <ProfileIcon />
+            <span>My Profile</span>
+          </button>
           <button type="button" className="profile-menu-item" role="menuitem" onClick={handleLogout}>
             <LogoutIcon />
             <span>Log out</span>

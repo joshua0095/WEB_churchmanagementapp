@@ -27,7 +27,10 @@ import { getPageSize, setPageSize } from "../preferences";
 import { confirmDialog, infoAlert, successToast } from "../swal";
 
 const emptyCongregantForm = {
-  name: "",
+  firstName: "",
+  middleName: "",
+  lastName: "",
+  nickname: "",
   birthday: "",
   gender: "" as "" | Gender,
   oldCategory: "",
@@ -105,7 +108,7 @@ function PeopleCongregation() {
   const filteredCongregation = useMemo(() => {
     const q = search.trim().toLowerCase();
     return congregation.filter((m) => {
-      if (q && !m.name.toLowerCase().includes(q)) return false;
+      if (q && !m.name.toLowerCase().includes(q) && !m.nickname?.toLowerCase().includes(q)) return false;
       if (congOldFilter && (m.oldCategory ?? "") !== congOldFilter) return false;
       if (congNewFilter && (m.newCategory ?? "") !== congNewFilter) return false;
       if (congGenderFilter && (m.gender ?? "") !== congGenderFilter) return false;
@@ -175,7 +178,10 @@ function PeopleCongregation() {
   const openEditCongregant = (m: CongregationMember) => {
     setEditingCongregantId(m.id);
     setCongregantForm({
-      name: m.name,
+      firstName: m.firstName,
+      middleName: m.middleName ?? "",
+      lastName: m.lastName,
+      nickname: m.nickname ?? "",
       birthday: m.birthday ? m.birthday.slice(0, 10) : "",
       gender: m.gender ?? "",
       oldCategory: m.oldCategory ?? "",
@@ -186,12 +192,15 @@ function PeopleCongregation() {
   };
 
   const handleSaveCongregant = async () => {
-    if (!congregantForm.name.trim()) return;
+    if (!congregantForm.firstName.trim() || !congregantForm.lastName.trim()) return;
     setSavingCongregant(true);
     setCongregantFormError(null);
     try {
       const payload = {
-        name: congregantForm.name.trim(),
+        firstName: congregantForm.firstName.trim(),
+        middleName: congregantForm.middleName.trim() || null,
+        lastName: congregantForm.lastName.trim(),
+        nickname: congregantForm.nickname.trim() || null,
         birthday: congregantForm.birthday || null,
         gender: congregantForm.gender || null,
         oldCategory: congregantForm.oldCategory.trim() || null,
@@ -418,7 +427,7 @@ function PeopleCongregation() {
             <Button
               type="button"
               onClick={handleSaveCongregant}
-              disabled={savingCongregant || !congregantForm.name.trim()}
+              disabled={savingCongregant || !congregantForm.firstName.trim() || !congregantForm.lastName.trim()}
             >
               {savingCongregant ? "Saving..." : editingCongregantId === null ? "Add" : "Save changes"}
             </Button>
@@ -427,11 +436,27 @@ function PeopleCongregation() {
       >
         <div className="flex flex-col gap-4">
           <TextField
-            label="Full name"
-            value={congregantForm.name}
-            onChange={(e) => setCongregantForm((f) => ({ ...f, name: e.target.value }))}
+            label="First name"
+            value={congregantForm.firstName}
+            onChange={(e) => setCongregantForm((f) => ({ ...f, firstName: e.target.value }))}
             autoFocus
             required
+          />
+          <TextField
+            label="Middle name (optional)"
+            value={congregantForm.middleName}
+            onChange={(e) => setCongregantForm((f) => ({ ...f, middleName: e.target.value }))}
+          />
+          <TextField
+            label="Last name"
+            value={congregantForm.lastName}
+            onChange={(e) => setCongregantForm((f) => ({ ...f, lastName: e.target.value }))}
+            required
+          />
+          <TextField
+            label="Nickname (optional)"
+            value={congregantForm.nickname}
+            onChange={(e) => setCongregantForm((f) => ({ ...f, nickname: e.target.value }))}
           />
           <SelectField
             label="Gender"

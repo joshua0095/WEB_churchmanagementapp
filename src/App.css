@@ -79,6 +79,12 @@
     margin: 0;
   }
 
+  .welcome-subtitle {
+    color: var(--color-text-secondary);
+    font-size: 0.95rem;
+    margin: 0.35rem 0 0;
+  }
+
   .home-highlights {
     display: flex;
     flex-direction: column;

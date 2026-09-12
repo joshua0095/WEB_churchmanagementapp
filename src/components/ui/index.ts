@@ -25,3 +25,4 @@ export { default as Accordion } from "./Accordion";
 export { default as Pagination } from "./Pagination";
 export { default as FilterBar } from "./FilterBar";
 export { default as DatePicker } from "./DatePicker";
+export { default as Tabs } from "./Tabs";

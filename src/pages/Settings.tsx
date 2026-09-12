@@ -45,6 +45,7 @@ import {
   Modal,
   Skeleton,
   SelectField,
+  Tabs,
   TextField,
 } from "../components/ui";
 import { ChevronDownIcon } from "../components/ui/icons";
@@ -58,6 +59,15 @@ import { getBibleVersionId, setBibleVersionId, type BibleModule } from "../prefe
 import { confirmDialog, infoAlert, successToast } from "../swal";
 
 const emptyLifeGroupForm = { groupName: "", leaderId: "", networkId: "", category: "Church" as LifeGroupCategory };
+
+type SettingsTab = "general" | "attendance" | "lifegroups" | "networks" | "access";
+const SETTINGS_TABS: { key: SettingsTab; label: string }[] = [
+  { key: "general", label: "General" },
+  { key: "attendance", label: "Attendance" },
+  { key: "lifegroups", label: "Life Groups" },
+  { key: "networks", label: "Networks" },
+  { key: "access", label: "Access" },
+];
 
 interface LeaderPickerProps {
   users: User[];
@@ -437,6 +447,8 @@ function ManageNetworkNode({
 }
 
 function Settings() {
+  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+
   const [versions, setVersions] = useState<BibleVersion[]>([]);
   const [selected, setSelected] = useState<Record<BibleModule, string>>({
     verseOfTheDay: getBibleVersionId("verseOfTheDay") ?? "",
@@ -812,46 +824,52 @@ function Settings() {
         <h1>Settings</h1>
       </div>
 
-      <Card>
-        <h2 className="section-title">Bible Version</h2>
-        <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
-          Choose a translation for each module — they can be set independently.
-        </p>
-        {loading && (
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-3 w-32" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-3 w-32" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          </div>
-        )}
-        {error && <p className="error">{error}</p>}
-        {!loading && !error && (
-          <div className="flex flex-col gap-4">
-            {BIBLE_MODULES.map((mod) => (
-              <SelectField
-                key={mod.key}
-                label={mod.label}
-                value={selected[mod.key]}
-                onChange={(e) => handleChange(mod.key, e.target.value)}
-              >
-                {versions.map((v) => (
-                  <option key={v.id} value={v.id}>
-                    {v.title} ({v.abbreviation})
-                  </option>
-                ))}
-              </SelectField>
-            ))}
-          </div>
-        )}
-      </Card>
-
       {canManageAccess && (
-        <Card className="mt-6">
+        <Tabs items={SETTINGS_TABS} activeKey={activeTab} onChange={setActiveTab} className="mb-6" />
+      )}
+
+      {(!canManageAccess || activeTab === "general") && (
+        <Card>
+          <h2 className="section-title">Bible Version</h2>
+          <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
+            Choose a translation for each module — they can be set independently.
+          </p>
+          {loading && (
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+              <div className="flex flex-col gap-2">
+                <Skeleton className="h-3 w-32" />
+                <Skeleton className="h-10 w-full" />
+              </div>
+            </div>
+          )}
+          {error && <p className="error">{error}</p>}
+          {!loading && !error && (
+            <div className="flex flex-col gap-4">
+              {BIBLE_MODULES.map((mod) => (
+                <SelectField
+                  key={mod.key}
+                  label={mod.label}
+                  value={selected[mod.key]}
+                  onChange={(e) => handleChange(mod.key, e.target.value)}
+                >
+                  {versions.map((v) => (
+                    <option key={v.id} value={v.id}>
+                      {v.title} ({v.abbreviation})
+                    </option>
+                  ))}
+                </SelectField>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
+      {canManageAccess && activeTab === "attendance" && (
+        <Card>
           <h2 className="section-title">Attendance Events</h2>
           <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
             "Roster" controls which named check-in this event accepts — some events (like
@@ -903,8 +921,8 @@ function Settings() {
         </Card>
       )}
 
-      {canManageAccess && (
-        <Card className="mt-6">
+      {canManageAccess && activeTab === "lifegroups" && (
+        <Card>
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="section-title !mb-0">Life Groups</h2>
             <Button type="button" onClick={openAddLifeGroup}>
@@ -939,8 +957,8 @@ function Settings() {
         </Card>
       )}
 
-      {canManageAccess && (
-        <Card className="mt-6">
+      {canManageAccess && activeTab === "networks" && (
+        <Card>
           <div className="mb-4 flex items-center justify-between gap-3">
             <h2 className="section-title !mb-0">Networks &amp; Ministries</h2>
             <div className="flex gap-2">
@@ -978,8 +996,8 @@ function Settings() {
         </Card>
       )}
 
-      {canManageAccess && (
-        <Card className="mt-6">
+      {canManageAccess && activeTab === "access" && (
+        <Card>
           <h2 className="section-title">Module Access by Network</h2>
           <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
             Control which modules each network can use. Admins always have full access. A network with no

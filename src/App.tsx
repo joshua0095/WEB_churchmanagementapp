@@ -14,6 +14,7 @@ import Home from "./pages/Home";
 import Login from "./pages/Login";
 import PeopleCongregation from "./pages/PeopleCongregation";
 import PeopleWorkers from "./pages/PeopleWorkers";
+import Profile from "./pages/Profile";
 import Reports from "./pages/Reports";
 import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
@@ -35,6 +36,7 @@ function App() {
         <Route path="/people/congregation" element={<PeopleCongregation />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/settings" element={<Settings />} />
+        <Route path="/profile" element={<Profile />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/attendance/workers" element={<AttendanceWorkers />} />
         <Route path="/attendance/congregation" element={<AttendanceCongregation />} />

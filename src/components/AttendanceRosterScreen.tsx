@@ -11,7 +11,7 @@ import {
   SkeletonListRow,
   TextField,
 } from "./ui";
-import { BackIcon, CheckIcon } from "./ui/icons";
+import { BackIcon, CheckedIcon, CheckIcon } from "./ui/icons";
 import { confirmDialog, successToast } from "../swal";
 
 function toTimeInputValue(iso: string): string {
@@ -85,6 +85,19 @@ function AttendanceRosterScreen({
     return roster.people.filter((p) => p.name.toLowerCase().includes(q));
   }, [roster, query]);
 
+  // Applies the result of a check-in/undo straight to the already-loaded roster instead of
+  // re-fetching it — a full reload's round trip is what made tapping "Mark as present" feel
+  // laggy, when the mutation call itself already returns everything the row needs.
+  const patchPerson = (personId: number, patch: Partial<AttendancePerson>, countDelta: number) => {
+    setRoster((prev) =>
+      prev && {
+        ...prev,
+        checkedInCount: prev.checkedInCount + countDelta,
+        people: prev.people.map((p) => (p.personId === personId ? { ...p, ...patch } : p)),
+      },
+    );
+  };
+
   const handleToggle = async (person: AttendancePerson) => {
     if (person.recordId) {
       const confirmed = await confirmDialog({
@@ -96,14 +109,14 @@ function AttendanceRosterScreen({
       if (!confirmed) return;
       try {
         await onUndo(person.recordId);
-        await reload();
+        patchPerson(person.personId, { recordId: null, checkedInAt: null }, -1);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to remove attendance");
       }
     } else {
       try {
-        await onCheckIn(person.personId);
-        await reload();
+        const { recordId, checkedInAt } = await onCheckIn(person.personId);
+        patchPerson(person.personId, { recordId, checkedInAt }, 1);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to check in");
       }
@@ -192,7 +205,7 @@ function AttendanceRosterScreen({
           {visiblePeople.map((person) => (
             <li
               key={person.personId}
-              className="flex min-h-[92px] items-stretch overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]"
+              className="flex min-h-[92px] items-stretch overflow-hidden rounded-md bg-[var(--color-surface)] shadow-[var(--shadow-card)]"
             >
               <div className="flex flex-1 flex-col justify-center gap-1.5 px-5 py-4">
                 <span className="text-lg font-bold text-[var(--color-navy)]">{person.name}</span>
@@ -235,13 +248,17 @@ function AttendanceRosterScreen({
                 onClick={() => handleToggle(person)}
                 aria-label={person.recordId ? `Unmark ${person.name} as present` : `Mark ${person.name} as present`}
                 className={[
-                  "flex w-24 shrink-0 items-center justify-center border-l transition-colors",
+                  "flex w-24 shrink-0 items-center justify-center transition-colors",
                   person.recordId
-                    ? "border-[var(--color-gold)] bg-[var(--color-gold)] text-[var(--color-text-on-gold)]"
-                    : "border-[var(--color-border)] bg-transparent text-[var(--color-text-secondary)] hover:bg-black/5",
+                    ? "bg-[var(--color-gold)] text-[var(--color-text-on-gold)]"
+                    : "bg-transparent text-[var(--color-text-secondary)] hover:bg-black/5",
                 ].join(" ")}
               >
-                <CheckIcon className="h-8 w-8" />
+                {person.recordId ? (
+                  <CheckedIcon className="ui-check-pop h-7 w-7" />
+                ) : (
+                  <CheckIcon className="h-8 w-8" />
+                )}
               </button>
             </li>
           ))}

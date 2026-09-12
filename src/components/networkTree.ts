@@ -28,6 +28,18 @@ export function buildNetworkTree(networks: Network[], ministries: Ministry[]): N
   return build(null);
 }
 
+/** Returns the ids of every network above `networkId`, walking up ParentNetworkId to the root (e.g. WAN -> MDN). */
+export function getAncestorNetworkIds(networkId: number, networks: Network[]): number[] {
+  const byId = new Map(networks.map((n) => [n.id, n]));
+  const ancestors: number[] = [];
+  let current = byId.get(networkId);
+  while (current?.parentNetworkId != null) {
+    ancestors.push(current.parentNetworkId);
+    current = byId.get(current.parentNetworkId);
+  }
+  return ancestors;
+}
+
 /** Flattens a tree into select-option order (parent immediately before its children), with a depth for indentation. */
 export function flattenNetworksForSelect(tree: NetworkTreeNode[]): { id: number; name: string; depth: number }[] {
   const out: { id: number; name: string; depth: number }[] = [];

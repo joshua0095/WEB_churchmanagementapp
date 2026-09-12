@@ -3,6 +3,8 @@ import { useNavigate } from "react-router-dom";
 import {
   addLifeGroupMember,
   createLifeGroup,
+  currentChurchSessionDate,
+  formatLifeGroupDate,
   getLifeGroupRoster,
   getLifeGroups,
   getUsers,
@@ -13,11 +15,14 @@ import {
   type LifeGroupSummary,
   type User,
 } from "../api";
+import { isAdmin, isRegistrar } from "../auth";
+import ChurchWeekPicker from "../components/ChurchWeekPicker";
 import LifeGroupMemberList from "../components/LifeGroupMemberList";
 import {
   Accordion,
   AppShell,
   Button,
+  DatePicker,
   IconButton,
   Modal,
   ProfileMenu,
@@ -39,17 +44,21 @@ function todayIso(): string {
 
 interface GroupSession {
   sessionId: number;
+  date: string;
   roster: LifeGroupRoster;
 }
 
 function AttendanceLifeGroups() {
   const navigate = useNavigate();
-  const date = todayIso();
+  const overseer = isAdmin() || isRegistrar();
 
   const [groups, setGroups] = useState<LifeGroupSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<Record<number, GroupSession>>({});
+  // A group's chosen session date — a full calendar date for Community, or the date
+  // computed from the picked week-of-month for Church. Defaults to today until changed.
+  const [groupDates, setGroupDates] = useState<Record<number, string>>({});
   const [expandedLoading, setExpandedLoading] = useState<number | null>(null);
 
   const [addGroupOpen, setAddGroupOpen] = useState(false);
@@ -76,16 +85,32 @@ function AttendanceLifeGroups() {
     }
   };
 
+  // This screen lists and manages every life group system-wide — Admin/Registrar only.
+  // A leader who isn't an overseer has their own single/multi-group flow already on the
+  // Attendance hub (which lands them straight on their group's management page when they
+  // lead only one), so send anyone else back there instead of exposing every group here.
   useEffect(() => {
+    if (!overseer) {
+      navigate("/attendance", { replace: true });
+      return;
+    }
     loadGroups();
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [overseer]);
 
-  const loadGroupSession = async (groupId: number) => {
-    setExpandedLoading(groupId);
+  if (!overseer) return null;
+
+  const loadGroupSession = async (group: LifeGroupSummary, dateOverride?: string) => {
+    const requestedDate = dateOverride ?? groupDates[group.id] ?? todayIso();
+    // A Church group's session is always keyed by that week's Sunday, even before a
+    // leader has touched the week picker — a Community group's date is used as-is.
+    const sessionDate =
+      group.category === "Community" ? requestedDate : currentChurchSessionDate(requestedDate);
+    setExpandedLoading(group.id);
     try {
-      const session = await openLifeGroupSession(groupId, date);
+      const session = await openLifeGroupSession(group.id, sessionDate);
       const roster = await getLifeGroupRoster(session.id);
-      setSessions((prev) => ({ ...prev, [groupId]: { sessionId: session.id, roster } }));
+      setSessions((prev) => ({ ...prev, [group.id]: { sessionId: session.id, date: sessionDate, roster } }));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load group attendance");
     } finally {
@@ -93,11 +118,36 @@ function AttendanceLifeGroups() {
     }
   };
 
+  const changeGroupDate = (group: LifeGroupSummary, iso: string) => {
+    setGroupDates((prev) => ({ ...prev, [group.id]: iso }));
+    void loadGroupSession(group, iso);
+  };
+
   const refreshGroupSession = async (groupId: number) => {
     const existing = sessions[groupId];
     if (!existing) return;
     const roster = await getLifeGroupRoster(existing.sessionId);
     setSessions((prev) => ({ ...prev, [groupId]: { ...prev[groupId], roster } }));
+  };
+
+  // Patches one member's check-in state directly instead of re-fetching the whole roster —
+  // the check-in/undo call already tells us everything this needs.
+  const patchGroupMember = (groupId: number, memberId: number, recordId: number | null) => {
+    setSessions((prev) => {
+      const existing = prev[groupId];
+      if (!existing) return prev;
+      return {
+        ...prev,
+        [groupId]: {
+          ...existing,
+          roster: {
+            ...existing.roster,
+            checkedInCount: existing.roster.checkedInCount + (recordId ? 1 : -1),
+            people: existing.roster.people.map((p) => (p.memberId === memberId ? { ...p, recordId } : p)),
+          },
+        },
+      };
+    });
   };
 
   const openAddGroup = async () => {
@@ -159,7 +209,7 @@ function AttendanceLifeGroups() {
           </IconButton>
           <div>
             <h1 className="font-display text-2xl font-bold text-[var(--color-navy)]">Life Groups</h1>
-            <p className="mt-1 text-base font-semibold text-[var(--color-text-secondary)]">{date}</p>
+            <p className="mt-1 text-base font-semibold text-[var(--color-text-secondary)]">{formatLifeGroupDate(todayIso())}</p>
           </div>
         </div>
         <Button type="button" onClick={openAddGroup}>
@@ -188,7 +238,7 @@ function AttendanceLifeGroups() {
                   <div
                     className="flex flex-1 items-center justify-between gap-4"
                     onClick={() => {
-                      if (!sessions[group.id] && expandedLoading !== group.id) void loadGroupSession(group.id);
+                      if (!sessions[group.id] && expandedLoading !== group.id) void loadGroupSession(group);
                     }}
                   >
                     <div>
@@ -218,11 +268,26 @@ function AttendanceLifeGroups() {
                   <Skeleton className="h-16 w-full rounded-md" />
                 ) : session ? (
                   <div className="flex flex-col gap-4">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                      {group.category === "Community" ? (
+                        <DatePicker
+                          value={session.date}
+                          onChange={(iso) => changeGroupDate(group, iso)}
+                          className="max-w-[200px]"
+                        />
+                      ) : (
+                        <ChurchWeekPicker
+                          value={session.date}
+                          onChange={(iso) => changeGroupDate(group, iso)}
+                          className="max-w-[200px]"
+                        />
+                      )}
+                    </div>
                     <LifeGroupMemberList
                       people={session.roster.people}
                       onCheckIn={(memberId) => lifeGroupCheckIn(session.sessionId, memberId)}
                       onUndo={undoLifeGroupCheckIn}
-                      onChanged={() => refreshGroupSession(group.id)}
+                      onToggled={(memberId, recordId) => patchGroupMember(group.id, memberId, recordId)}
                     />
                     <Button
                       type="button"

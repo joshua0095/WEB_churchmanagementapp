@@ -17,7 +17,7 @@ function Accordion({ header, children, defaultOpen = false }: AccordionProps) {
         type="button"
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-4 px-5 py-4 text-left"
+        className="flex w-full items-center justify-between gap-4 border-none bg-[var(--color-surface)] px-5 py-4 text-left outline-none focus-visible:shadow-[0_0_0_3px_rgba(242,183,5,0.5)]"
       >
         {header}
         <ChevronDownIcon

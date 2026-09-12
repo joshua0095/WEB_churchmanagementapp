@@ -2,17 +2,21 @@ import { useEffect, useState } from "react";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   addLifeGroupMember,
+  currentChurchSessionDate,
+  formatLifeGroupDate,
   getLifeGroup,
   getLifeGroupRoster,
   lifeGroupCheckIn,
   openLifeGroupSession,
   undoLifeGroupCheckIn,
+  weekOfMonthLabel,
   type LifeGroupDetail,
   type LifeGroupRoster,
 } from "../api";
 import { isAdmin, isRegistrar } from "../auth";
+import ChurchWeekPicker from "../components/ChurchWeekPicker";
 import LifeGroupMemberList from "../components/LifeGroupMemberList";
-import { AppShell, Button, IconButton, Modal, ProfileMenu, ProgressBar, Skeleton, TextField } from "../components/ui";
+import { AppShell, Button, DatePicker, IconButton, Modal, ProfileMenu, ProgressBar, Skeleton, TextField } from "../components/ui";
 import { BackIcon } from "../components/ui/icons";
 import { successToast } from "../swal";
 
@@ -28,13 +32,12 @@ function AttendanceLifeGroupDetail() {
   const { id } = useParams();
   const groupId = Number(id);
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const overseer = isAdmin() || isRegistrar();
   const date = searchParams.get("date") ?? todayIso();
 
   const [group, setGroup] = useState<LifeGroupDetail | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
-  const [weekNumber, setWeekNumber] = useState<number | null>(null);
   const [roster, setRoster] = useState<LifeGroupRoster | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -47,13 +50,17 @@ function AttendanceLifeGroupDetail() {
     setLoading(true);
     setError(null);
     try {
-      const [groupDetail, session] = await Promise.all([
-        getLifeGroup(groupId),
-        openLifeGroupSession(groupId, date),
-      ]);
+      const groupDetail = await getLifeGroup(groupId);
+      // A Church group's session is always keyed by that week's Sunday, even before a
+      // leader has touched the week picker — a Community group's date is used as-is.
+      const sessionDate = groupDetail.category === "Community" ? date : currentChurchSessionDate(date);
+      if (sessionDate !== date) {
+        setSearchParams({ date: sessionDate }, { replace: true });
+        return;
+      }
+      const session = await openLifeGroupSession(groupId, sessionDate);
       setGroup(groupDetail);
       setSessionId(session.id);
-      setWeekNumber(session.weekNumber);
       setRoster(await getLifeGroupRoster(session.id));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load this life group");
@@ -70,6 +77,18 @@ function AttendanceLifeGroupDetail() {
   const refreshRoster = async () => {
     if (sessionId === null) return;
     setRoster(await getLifeGroupRoster(sessionId));
+  };
+
+  // Patches one member's check-in state directly instead of re-fetching the whole roster —
+  // the check-in/undo call already tells us everything this needs.
+  const patchRosterMember = (memberId: number, recordId: number | null) => {
+    setRoster((prev) =>
+      prev && {
+        ...prev,
+        checkedInCount: prev.checkedInCount + (recordId ? 1 : -1),
+        people: prev.people.map((p) => (p.memberId === memberId ? { ...p, recordId } : p)),
+      },
+    );
   };
 
   const handleAddMember = async () => {
@@ -118,7 +137,7 @@ function AttendanceLifeGroupDetail() {
           <div>
             <h1 className="font-display text-2xl font-bold text-[var(--color-navy)]">{group.groupName}</h1>
             <p className="mt-1 text-base font-semibold text-[var(--color-text-secondary)]">
-              Week {weekNumber} — {date}
+              {group.category === "Community" ? formatLifeGroupDate(date) : weekOfMonthLabel(date)}
             </p>
             <p className="mt-1 text-sm text-[var(--color-text-secondary)]">
               {group.category === "Community" ? "Community" : "Church"} Life Group · Led by {group.leaderName}
@@ -129,6 +148,14 @@ function AttendanceLifeGroupDetail() {
         <Button type="button" onClick={() => setAddMemberOpen(true)}>
           + Add member
         </Button>
+      </div>
+
+      <div className="mb-6 max-w-xs">
+        {group.category === "Community" ? (
+          <DatePicker label="Attendance date" value={date} onChange={(iso) => setSearchParams({ date: iso })} />
+        ) : (
+          <ChurchWeekPicker value={date} onChange={(iso) => setSearchParams({ date: iso })} />
+        )}
       </div>
 
       {roster && (
@@ -145,7 +172,7 @@ function AttendanceLifeGroupDetail() {
           people={roster.people}
           onCheckIn={(memberId) => lifeGroupCheckIn(sessionId, memberId)}
           onUndo={undoLifeGroupCheckIn}
-          onChanged={refreshRoster}
+          onToggled={patchRosterMember}
         />
       )}
 

@@ -28,6 +28,7 @@ import {
   Users,
   UsersGroup,
 } from "flowbite-react-icons/outline";
+import { CheckCircle as CheckCircleSolid } from "flowbite-react-icons/solid";
 
 export const MenuIcon = Bars;
 export const BackIcon = AngleLeft;
@@ -47,6 +48,8 @@ export const SettingsIcon = Cog;
 export const AttendanceIcon = ClipboardCheck;
 export const HeadcountIcon = ChartMixed;
 export const CheckIcon = Check;
+/** Filled check-in-a-circle — swapped in once a person is marked present. */
+export const CheckedIcon = CheckCircleSolid;
 export const ClockIcon = Clock;
 export const LifeGroupIcon = UsersGroup;
 export const ChevronDownIcon = ChevronDown;
