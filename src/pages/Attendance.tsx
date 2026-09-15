@@ -1,18 +1,38 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import {
+  addLifeGroupMember,
   getAttendanceEvents,
   getCongregationRoster,
   getMyLifeGroups,
   getWorkerRoster,
+  lifeGroupCheckIn,
   openAttendanceSession,
+  setLifeGroupFirstTimer,
+  undoLifeGroupCheckIn,
   type AttendanceEvent,
   type AttendanceTrackingType,
   type LifeGroup,
 } from "../api";
 import { isAdmin, isRegistrar } from "../auth";
-import { AppShell, Button, Card, DatePicker, ProfileMenu, ProgressBar, Skeleton } from "../components/ui";
+import ChurchWeekPicker from "../components/ChurchWeekPicker";
+import FollowUpModal from "../components/FollowUpModal";
+import LifeGroupMemberList from "../components/LifeGroupMemberList";
+import {
+  Accordion,
+  AppShell,
+  Button,
+  Card,
+  DatePicker,
+  Modal,
+  ProfileMenu,
+  ProgressBar,
+  Skeleton,
+  TextField,
+} from "../components/ui";
 import { AttendanceIcon, BackIcon, HeadcountIcon, LifeGroupIcon, UserListIcon } from "../components/ui/icons";
+import { useLifeGroupSessions } from "../hooks/useLifeGroupSessions";
+import { successToast } from "../swal";
 
 function dateToIso(d: Date): string {
   const y = d.getFullYear();
@@ -50,7 +70,7 @@ interface Progress {
   checkedInCount: number;
 }
 
-type Step = "event" | "date" | "type";
+type Step = "event" | "date" | "type" | "lifegroups";
 
 function Attendance() {
   const navigate = useNavigate();
@@ -60,9 +80,21 @@ function Attendance() {
   const [accessError, setAccessError] = useState<string | null>(null);
 
   const [myGroups, setMyGroups] = useState<LifeGroup[]>([]);
-  const [leaderStep, setLeaderStep] = useState<"date" | "group">("group");
-  const [leaderDate, setLeaderDate] = useState(todayIso());
-  const [dateStepGroupId, setDateStepGroupId] = useState<number | null>(null);
+  const {
+    sessions,
+    expandedLoading,
+    error: sessionError,
+    setError: setSessionError,
+    loadGroupSession,
+    changeGroupDate,
+    refreshGroupSession,
+    patchGroupMember,
+    patchGroupMemberFirstTimer,
+  } = useLifeGroupSessions();
+  const [addMemberGroupId, setAddMemberGroupId] = useState<number | null>(null);
+  const [newMemberName, setNewMemberName] = useState("");
+  const [addingMember, setAddingMember] = useState(false);
+  const [followUpGroupId, setFollowUpGroupId] = useState<number | null>(null);
 
   const [events, setEvents] = useState<AttendanceEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -87,17 +119,6 @@ function Attendance() {
           setAccessError("You don't have access to Attendance.");
         } else {
           setMyGroups(groups);
-          // A single group skips straight to the date step (if choosable) or straight
-          // to today's session — no need to make the leader pick a group of one.
-          if (groups.length === 1) {
-            const only = groups[0];
-            if (only.category === "Community") {
-              setDateStepGroupId(only.id);
-              setLeaderStep("date");
-            } else {
-              navigate(`/attendance/lifegroups/${only.id}`);
-            }
-          }
         }
         setCheckingAccess(false);
       })
@@ -107,6 +128,16 @@ function Attendance() {
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [overseer]);
+
+  // A leader with only the one Life Group sees it as a forced-open, non-collapsible
+  // Accordion — there's nothing to pick, so its session loads immediately rather than
+  // waiting for a header click that will never come.
+  useEffect(() => {
+    if (myGroups.length !== 1) return;
+    const only = myGroups[0];
+    if (!sessions[only.id] && expandedLoading !== only.id) void loadGroupSession(only);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [myGroups]);
 
   useEffect(() => {
     if (!overseer) return;
@@ -176,75 +207,24 @@ function Attendance() {
     );
   }
 
-  if (!overseer) {
-    // Church Life Groups always take attendance for the current week — no date to
-    // pick. Community Life Groups can log attendance for any date, so leaders of
-    // those groups get the date step; the resulting week label is derived from it.
-    const chooseGroup = (group: LifeGroup) => {
-      if (group.category === "Community") {
-        setDateStepGroupId(group.id);
-        setLeaderStep("date");
-      } else {
-        navigate(`/attendance/lifegroups/${group.id}`);
-      }
-    };
+  const singleGroup = myGroups.length === 1;
 
-    const confirmLeaderDate = (iso: string) => {
-      setLeaderDate(iso);
-      if (dateStepGroupId !== null) {
-        navigate(`/attendance/lifegroups/${dateStepGroupId}?date=${iso}`);
-      }
-    };
-
-    return (
-      <AppShell headerRight={<ProfileMenu />}>
-        <div className="page-header">
-          <h1>Attendance</h1>
-        </div>
-
-        {leaderStep === "date" && (
-          <>
-            {myGroups.length > 1 && (
-              <button
-                type="button"
-                onClick={() => setLeaderStep("group")}
-                className="mb-4 flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-sm font-bold text-[var(--color-text-secondary)] hover:text-[var(--color-navy)]"
-              >
-                <BackIcon className="h-4 w-4" /> Change group
-              </button>
-            )}
-            <p className="helper-text mb-4">Tap the date this attendance is for.</p>
-            <div className="flex justify-center">
-              <DatePicker inline value={leaderDate} onChange={confirmLeaderDate} />
-            </div>
-          </>
-        )}
-
-        {leaderStep === "group" && (
-          <>
-            <p className="helper-text mb-4">Choose which Life Group to take attendance for.</p>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {myGroups.map((group) => (
-                <button
-                  key={group.id}
-                  type="button"
-                  onClick={() => chooseGroup(group)}
-                  className="cursor-pointer border-0 bg-transparent p-0 text-left"
-                >
-                  <Card className="flex items-center gap-3 !p-5">
-                    <LifeGroupIcon className="h-6 w-6 shrink-0 text-[var(--color-navy)]" />
-                    <span className="font-display text-lg font-bold text-[var(--color-navy)]">
-                      {group.groupName}
-                    </span>
-                  </Card>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </AppShell>
-    );
-  }
+  const handleAddMember = async () => {
+    if (addMemberGroupId === null || !newMemberName.trim()) return;
+    setAddingMember(true);
+    try {
+      await addLifeGroupMember(addMemberGroupId, newMemberName.trim());
+      setNewMemberName("");
+      const groupId = addMemberGroupId;
+      setAddMemberGroupId(null);
+      await refreshGroupSession(groupId);
+      successToast("Member added");
+    } catch (err) {
+      setSessionError(err instanceof Error ? err.message : "Failed to add member");
+    } finally {
+      setAddingMember(false);
+    }
+  };
 
   const selectedEvent = events.find((e) => e.id === selectedEventId) ?? null;
 
@@ -271,35 +251,180 @@ function Attendance() {
       {step === "event" && (
         <>
           <p className="helper-text mb-6">Choose what you're taking attendance for.</p>
-          {loadingEvents ? (
+          {overseer && loadingEvents ? (
             <Skeleton className="h-14 w-full max-w-md rounded-md" />
           ) : (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {events.map((event) => (
+              {overseer &&
+                events.map((event) => (
+                  <button
+                    key={event.id}
+                    type="button"
+                    onClick={() => selectEvent(event)}
+                    className="cursor-pointer border-0 bg-transparent p-0 text-left"
+                  >
+                    <Card className="flex items-center gap-3 !p-5">
+                      <AttendanceIcon className="h-6 w-6 shrink-0 text-[var(--color-navy)]" />
+                      <span className="font-display text-lg font-bold text-[var(--color-navy)]">{event.name}</span>
+                    </Card>
+                  </button>
+                ))}
+              {/* A non-overseer only ever has access to their own Life Group(s) — Bible
+                  Reading / WHS / Worker's Empowerment / Headcount are Admin/Registrar-only
+                  at the API level, so there's nothing else to show them here. */}
+              {(overseer || myGroups.length > 0) && (
                 <button
-                  key={event.id}
                   type="button"
-                  onClick={() => selectEvent(event)}
+                  onClick={() => (overseer ? navigate("/attendance/lifegroups") : setStep("lifegroups"))}
                   className="cursor-pointer border-0 bg-transparent p-0 text-left"
                 >
                   <Card className="flex items-center gap-3 !p-5">
-                    <AttendanceIcon className="h-6 w-6 shrink-0 text-[var(--color-navy)]" />
-                    <span className="font-display text-lg font-bold text-[var(--color-navy)]">{event.name}</span>
+                    <LifeGroupIcon className="h-6 w-6 shrink-0 text-[var(--color-navy)]" />
+                    <span className="font-display text-lg font-bold text-[var(--color-navy)]">Life Groups</span>
                   </Card>
                 </button>
-              ))}
-              <button
-                type="button"
-                onClick={() => navigate("/attendance/lifegroups")}
-                className="cursor-pointer border-0 bg-transparent p-0 text-left"
-              >
-                <Card className="flex items-center gap-3 !p-5">
-                  <LifeGroupIcon className="h-6 w-6 shrink-0 text-[var(--color-navy)]" />
-                  <span className="font-display text-lg font-bold text-[var(--color-navy)]">Life Groups</span>
-                </Card>
-              </button>
+              )}
             </div>
           )}
+        </>
+      )}
+
+      {step === "lifegroups" && !overseer && (
+        <>
+          <button
+            type="button"
+            onClick={() => setStep("event")}
+            className="mb-4 mt-2 flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-sm font-bold text-[var(--color-text-secondary)] hover:text-[var(--color-navy)]"
+          >
+            <BackIcon className="h-4 w-4" /> Back
+          </button>
+
+          <p className="helper-text mb-4">
+            {singleGroup ? "Take attendance for your Life Group." : "Tap a Life Group to take its attendance."}
+          </p>
+
+          {sessionError && <p className="error mb-4">{sessionError}</p>}
+
+          <div className="flex flex-col gap-3">
+            {myGroups.map((group) => {
+              const session = sessions[group.id];
+              return (
+                <Accordion
+                  key={group.id}
+                  forceOpen={singleGroup}
+                  header={
+                    <div
+                      className="flex flex-1 items-center justify-between gap-4"
+                      onClick={() => {
+                        if (!sessions[group.id] && expandedLoading !== group.id) void loadGroupSession(group);
+                      }}
+                    >
+                      <div className="flex items-center gap-3">
+                        <LifeGroupIcon className="h-6 w-6 shrink-0 text-[var(--color-navy)]" />
+                        <div>
+                          <p className="text-lg font-bold text-[var(--color-navy)]">{group.groupName}</p>
+                          <p className="text-sm text-[var(--color-text-secondary)]">
+                            {group.category === "Community" ? "Community" : "Church"} Life Group
+                          </p>
+                        </div>
+                      </div>
+                      {session && (
+                        <div className="hidden min-w-40 sm:block">
+                          <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
+                            {session.roster.checkedInCount} of {session.roster.total} present
+                          </p>
+                          <ProgressBar value={session.roster.checkedInCount} max={session.roster.total} />
+                        </div>
+                      )}
+                    </div>
+                  }
+                >
+                  {expandedLoading === group.id ? (
+                    <Skeleton className="h-16 w-full rounded-md" />
+                  ) : session ? (
+                    <div className="flex flex-col gap-4">
+                      <div className="flex flex-wrap items-end justify-between gap-3">
+                        {group.category === "Community" ? (
+                          <DatePicker
+                            value={session.date}
+                            onChange={(iso) => changeGroupDate(group, iso)}
+                            className="max-w-[200px]"
+                          />
+                        ) : (
+                          <ChurchWeekPicker
+                            value={session.date}
+                            onChange={(iso) => changeGroupDate(group, iso)}
+                            className="max-w-[200px]"
+                          />
+                        )}
+                      </div>
+                      <LifeGroupMemberList
+                        people={session.roster.people}
+                        onCheckIn={(memberId) => lifeGroupCheckIn(session.sessionId, memberId)}
+                        onUndo={undoLifeGroupCheckIn}
+                        onToggled={(memberId, recordId) => patchGroupMember(group.id, memberId, recordId)}
+                        onSetFirstTimer={setLifeGroupFirstTimer}
+                        onFirstTimerToggled={(memberId, isFirstTimer) =>
+                          patchGroupMemberFirstTimer(group.id, memberId, isFirstTimer)
+                        }
+                      />
+                      <div className="flex flex-wrap gap-3">
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => setAddMemberGroupId(group.id)}
+                          className="self-start"
+                        >
+                          + Add member
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="secondary"
+                          onClick={() => setFollowUpGroupId(group.id)}
+                          className="self-start"
+                        >
+                          Follow up
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="helper-text">Tap this section to load attendance.</p>
+                  )}
+                </Accordion>
+              );
+            })}
+          </div>
+
+          <FollowUpModal
+            open={followUpGroupId !== null}
+            onClose={() => setFollowUpGroupId(null)}
+            sessionId={followUpGroupId !== null ? (sessions[followUpGroupId]?.sessionId ?? null) : null}
+            people={followUpGroupId !== null ? (sessions[followUpGroupId]?.roster.people ?? []) : []}
+          />
+
+          <Modal
+            open={addMemberGroupId !== null}
+            onClose={() => setAddMemberGroupId(null)}
+            title="Add member"
+            footer={
+              <>
+                <Button type="button" variant="secondary" onClick={() => setAddMemberGroupId(null)}>
+                  Cancel
+                </Button>
+                <Button type="button" onClick={handleAddMember} disabled={addingMember || !newMemberName.trim()}>
+                  {addingMember ? "Adding..." : "Add"}
+                </Button>
+              </>
+            }
+          >
+            <TextField
+              label="Full name"
+              value={newMemberName}
+              onChange={(e) => setNewMemberName(e.target.value)}
+              placeholder="Enter their name"
+              autoFocus
+            />
+          </Modal>
         </>
       )}
 

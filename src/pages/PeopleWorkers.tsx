@@ -436,8 +436,9 @@ function PeopleWorkers() {
       ) : filteredUsers.length === 0 ? (
         <p className="helper-text">No workers match your search.</p>
       ) : (
-        <Card className="!p-0">
-          <div className="overflow-x-auto">
+        <Card className="!p-0 card-bleed">
+          {/* Desktop: column table. */}
+          <div className="hidden overflow-x-auto min-[900px]:block">
             <div className="min-w-[760px]">
               <div className="grid grid-cols-[2fr_1.4fr_1.6fr_1fr_48px] gap-3 border-b border-[var(--color-border)] px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
                 <span>Name</span>
@@ -479,6 +480,44 @@ function PeopleWorkers() {
               ))}
             </div>
           </div>
+
+          {/* Mobile: stacked cards — a grid row would force sideways scrolling to see every field. */}
+          <ul className="min-[900px]:hidden">
+            {pagedUsers.map((u) => (
+              <li key={u.id} className="border-b border-[var(--color-border)] px-4 py-3 last:border-b-0">
+                <div className="flex items-start gap-3">
+                  <InitialAvatar name={u.name} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="truncate font-semibold text-[var(--color-text-primary)]">{u.name}</p>
+                      {!u.isActive && (
+                        <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-[0.7rem] font-bold text-[var(--color-text-secondary)]">
+                          Deactivated
+                        </span>
+                      )}
+                    </div>
+                    <p className="truncate text-xs text-[var(--color-text-secondary)]">{u.email}</p>
+                    <dl className="mt-2 flex flex-col gap-1 text-sm text-[var(--color-text-secondary)]">
+                      <div className="flex gap-1.5">
+                        <dt className="shrink-0 font-semibold text-[var(--color-text-primary)]">Network:</dt>
+                        <dd>{u.networkIds.length > 0 ? u.networkIds.map(networkNameById).join(", ") : "—"}</dd>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <dt className="shrink-0 font-semibold text-[var(--color-text-primary)]">Ministry:</dt>
+                        <dd>{u.ministryIds.length > 0 ? u.ministryIds.map(ministryNameById).join(", ") : "—"}</dd>
+                      </div>
+                      <div className="flex gap-1.5">
+                        <dt className="shrink-0 font-semibold text-[var(--color-text-primary)]">Birthday:</dt>
+                        <dd>{formatBirthday(u.birthday)}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                  {canManageUsers && <DropdownMenu ariaLabel={`Actions for ${u.name}`} items={buildUserMenu(u)} />}
+                </div>
+              </li>
+            ))}
+          </ul>
+
           <Pagination
             page={usersPage}
             pageSize={usersPageSize}

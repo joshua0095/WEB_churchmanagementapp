@@ -3,20 +3,18 @@ import { useNavigate } from "react-router-dom";
 import {
   addLifeGroupMember,
   createLifeGroup,
-  currentChurchSessionDate,
   formatLifeGroupDate,
-  getLifeGroupRoster,
   getLifeGroups,
   getUsers,
   lifeGroupCheckIn,
-  openLifeGroupSession,
+  setLifeGroupFirstTimer,
   undoLifeGroupCheckIn,
-  type LifeGroupRoster,
   type LifeGroupSummary,
   type User,
 } from "../api";
 import { isAdmin, isRegistrar } from "../auth";
 import ChurchWeekPicker from "../components/ChurchWeekPicker";
+import FollowUpModal from "../components/FollowUpModal";
 import LifeGroupMemberList from "../components/LifeGroupMemberList";
 import {
   Accordion,
@@ -32,6 +30,7 @@ import {
   TextField,
 } from "../components/ui";
 import { BackIcon } from "../components/ui/icons";
+import { useLifeGroupSessions } from "../hooks/useLifeGroupSessions";
 import { successToast } from "../swal";
 
 function todayIso(): string {
@@ -42,12 +41,6 @@ function todayIso(): string {
   return `${y}-${m}-${day}`;
 }
 
-interface GroupSession {
-  sessionId: number;
-  date: string;
-  roster: LifeGroupRoster;
-}
-
 function AttendanceLifeGroups() {
   const navigate = useNavigate();
   const overseer = isAdmin() || isRegistrar();
@@ -55,11 +48,16 @@ function AttendanceLifeGroups() {
   const [groups, setGroups] = useState<LifeGroupSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [sessions, setSessions] = useState<Record<number, GroupSession>>({});
-  // A group's chosen session date — a full calendar date for Community, or the date
-  // computed from the picked week-of-month for Church. Defaults to today until changed.
-  const [groupDates, setGroupDates] = useState<Record<number, string>>({});
-  const [expandedLoading, setExpandedLoading] = useState<number | null>(null);
+  const {
+    sessions,
+    expandedLoading,
+    error: sessionError,
+    loadGroupSession,
+    changeGroupDate,
+    refreshGroupSession,
+    patchGroupMember,
+    patchGroupMemberFirstTimer,
+  } = useLifeGroupSessions();
 
   const [addGroupOpen, setAddGroupOpen] = useState(false);
   const [users, setUsers] = useState<User[]>([]);
@@ -70,6 +68,7 @@ function AttendanceLifeGroups() {
   const [addMemberGroupId, setAddMemberGroupId] = useState<number | null>(null);
   const [newMemberName, setNewMemberName] = useState("");
   const [addingMember, setAddingMember] = useState(false);
+  const [followUpGroupId, setFollowUpGroupId] = useState<number | null>(null);
 
   // `silent` skips the loading skeleton for a background refresh (e.g. after adding a
   // member) — otherwise every expanded Accordion would unmount/remount and collapse.
@@ -99,56 +98,6 @@ function AttendanceLifeGroups() {
   }, [overseer]);
 
   if (!overseer) return null;
-
-  const loadGroupSession = async (group: LifeGroupSummary, dateOverride?: string) => {
-    const requestedDate = dateOverride ?? groupDates[group.id] ?? todayIso();
-    // A Church group's session is always keyed by that week's Sunday, even before a
-    // leader has touched the week picker — a Community group's date is used as-is.
-    const sessionDate =
-      group.category === "Community" ? requestedDate : currentChurchSessionDate(requestedDate);
-    setExpandedLoading(group.id);
-    try {
-      const session = await openLifeGroupSession(group.id, sessionDate);
-      const roster = await getLifeGroupRoster(session.id);
-      setSessions((prev) => ({ ...prev, [group.id]: { sessionId: session.id, date: sessionDate, roster } }));
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load group attendance");
-    } finally {
-      setExpandedLoading(null);
-    }
-  };
-
-  const changeGroupDate = (group: LifeGroupSummary, iso: string) => {
-    setGroupDates((prev) => ({ ...prev, [group.id]: iso }));
-    void loadGroupSession(group, iso);
-  };
-
-  const refreshGroupSession = async (groupId: number) => {
-    const existing = sessions[groupId];
-    if (!existing) return;
-    const roster = await getLifeGroupRoster(existing.sessionId);
-    setSessions((prev) => ({ ...prev, [groupId]: { ...prev[groupId], roster } }));
-  };
-
-  // Patches one member's check-in state directly instead of re-fetching the whole roster —
-  // the check-in/undo call already tells us everything this needs.
-  const patchGroupMember = (groupId: number, memberId: number, recordId: number | null) => {
-    setSessions((prev) => {
-      const existing = prev[groupId];
-      if (!existing) return prev;
-      return {
-        ...prev,
-        [groupId]: {
-          ...existing,
-          roster: {
-            ...existing.roster,
-            checkedInCount: existing.roster.checkedInCount + (recordId ? 1 : -1),
-            people: existing.roster.people.map((p) => (p.memberId === memberId ? { ...p, recordId } : p)),
-          },
-        },
-      };
-    });
-  };
 
   const openAddGroup = async () => {
     setAddGroupOpen(true);
@@ -217,7 +166,7 @@ function AttendanceLifeGroups() {
         </Button>
       </div>
 
-      {error && <p className="error mb-4">{error}</p>}
+      {(error || sessionError) && <p className="error mb-4">{error ?? sessionError}</p>}
 
       {loading ? (
         <div className="flex flex-col gap-3">
@@ -288,15 +237,29 @@ function AttendanceLifeGroups() {
                       onCheckIn={(memberId) => lifeGroupCheckIn(session.sessionId, memberId)}
                       onUndo={undoLifeGroupCheckIn}
                       onToggled={(memberId, recordId) => patchGroupMember(group.id, memberId, recordId)}
+                      onSetFirstTimer={setLifeGroupFirstTimer}
+                      onFirstTimerToggled={(memberId, isFirstTimer) =>
+                        patchGroupMemberFirstTimer(group.id, memberId, isFirstTimer)
+                      }
                     />
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => setAddMemberGroupId(group.id)}
-                      className="self-start"
-                    >
-                      + Add member
-                    </Button>
+                    <div className="flex flex-wrap gap-3">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => setAddMemberGroupId(group.id)}
+                        className="self-start"
+                      >
+                        + Add member
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        onClick={() => setFollowUpGroupId(group.id)}
+                        className="self-start"
+                      >
+                        Follow up
+                      </Button>
+                    </div>
                   </div>
                 ) : (
                   <p className="helper-text">Tap this section to load attendance.</p>
@@ -306,6 +269,13 @@ function AttendanceLifeGroups() {
           })}
         </div>
       )}
+
+      <FollowUpModal
+        open={followUpGroupId !== null}
+        onClose={() => setFollowUpGroupId(null)}
+        sessionId={followUpGroupId !== null ? (sessions[followUpGroupId]?.sessionId ?? null) : null}
+        people={followUpGroupId !== null ? (sessions[followUpGroupId]?.roster.people ?? []) : []}
+      />
 
       <Modal
         open={addGroupOpen}

@@ -17,6 +17,19 @@
     }
   }
 
+  /* Lets a card bleed edge-to-edge on mobile (matching the .page side padding it
+     cancels out) so list cards like Workers/Congregation use the full viewport
+     width instead of floating with margins on small screens. */
+  @media (max-width: 899px) {
+    .card-bleed {
+      margin-left: -1.25rem;
+      margin-right: -1.25rem;
+      border-left: none;
+      border-right: none;
+      border-radius: 0;
+    }
+  }
+
   .page-header {
     display: flex;
     align-items: center;

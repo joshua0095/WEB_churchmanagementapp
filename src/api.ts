@@ -854,6 +854,7 @@ export interface LifeGroupPerson {
   memberId: number;
   name: string;
   recordId: number | null;
+  isFirstTimer: boolean;
 }
 
 export interface LifeGroupRoster {
@@ -869,6 +870,14 @@ export interface LifeGroupTrendPoint {
   date: string;
   checkedIn: number;
   total: number;
+}
+
+export type FollowUpMode = "Chat" | "Text" | "Personal" | "Call";
+
+export interface LifeGroupFollowUp {
+  memberId: number;
+  mode: FollowUpMode;
+  reason: string | null;
 }
 
 // Church Life Groups don't track attendance by a freely-chosen date — it's always framed
@@ -1068,12 +1077,83 @@ export async function undoLifeGroupCheckIn(recordId: number): Promise<void> {
   }
 }
 
+export async function setLifeGroupFirstTimer(
+  recordId: number,
+  isFirstTimer: boolean,
+): Promise<{ recordId: number; isFirstTimer: boolean }> {
+  const res = await apiFetch(`/api/lifegroups/records/${recordId}/first-timer`, {
+    method: "PUT",
+    body: JSON.stringify({ isFirstTimer }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update first-timer status (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function getLifeGroupTrend(id: number): Promise<LifeGroupTrendPoint[]> {
   const res = await apiFetch(`/api/lifegroups/${id}/report/trend`);
   if (!res.ok) {
     throw new Error(`Failed to fetch trend (${res.status})`);
   }
   return res.json();
+}
+
+export interface LifeGroupReportSession {
+  date: string;
+  total: number;
+  checkedIn: number;
+  firstTimerCount: number;
+}
+
+export interface LifeGroupReportRow {
+  id: number;
+  groupName: string;
+  leaderName: string;
+  networkId: number | null;
+  networkName: string | null;
+  category: LifeGroupCategory;
+  sessions: LifeGroupReportSession[];
+}
+
+export async function getLifeGroupMonthlyReport(year: number, month: number): Promise<LifeGroupReportRow[]> {
+  const res = await apiFetch(`/api/lifegroups/report/monthly?year=${year}&month=${month}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch Life Group report (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function getLifeGroupFollowUps(sessionId: number): Promise<LifeGroupFollowUp[]> {
+  const res = await apiFetch(`/api/lifegroups/sessions/${sessionId}/followups`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch follow-ups (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function saveLifeGroupFollowUp(
+  sessionId: number,
+  memberId: number,
+  request: { mode: FollowUpMode; reason: string | null },
+): Promise<LifeGroupFollowUp> {
+  const res = await apiFetch(`/api/lifegroups/sessions/${sessionId}/followups/${memberId}`, {
+    method: "PUT",
+    body: JSON.stringify(request),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to save follow-up (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function removeLifeGroupFollowUp(sessionId: number, memberId: number): Promise<void> {
+  const res = await apiFetch(`/api/lifegroups/sessions/${sessionId}/followups/${memberId}`, {
+    method: "DELETE",
+  });
+  if (!res.ok) {
+    throw new Error(`Failed to remove follow-up (${res.status})`);
+  }
 }
 
 // ---------- Module access (per-network) ----------

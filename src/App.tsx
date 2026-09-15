@@ -5,7 +5,6 @@ import Announcements from "./pages/Announcements";
 import Attendance from "./pages/Attendance";
 import AttendanceCongregation from "./pages/AttendanceCongregation";
 import AttendanceHeadcount from "./pages/AttendanceHeadcount";
-import AttendanceLifeGroupDetail from "./pages/AttendanceLifeGroupDetail";
 import AttendanceLifeGroups from "./pages/AttendanceLifeGroups";
 import AttendanceWorkers from "./pages/AttendanceWorkers";
 import Devotion from "./pages/Devotion";
@@ -16,6 +15,8 @@ import PeopleCongregation from "./pages/PeopleCongregation";
 import PeopleWorkers from "./pages/PeopleWorkers";
 import Profile from "./pages/Profile";
 import Reports from "./pages/Reports";
+import ReportsCongregation from "./pages/ReportsCongregation";
+import ReportsLifeGroups from "./pages/ReportsLifeGroups";
 import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
 import Signup from "./pages/Signup";
@@ -35,6 +36,8 @@ function App() {
         <Route path="/people/workers" element={<PeopleWorkers />} />
         <Route path="/people/congregation" element={<PeopleCongregation />} />
         <Route path="/reports" element={<Reports />} />
+        <Route path="/reports/congregation" element={<ReportsCongregation />} />
+        <Route path="/reports/lifegroups" element={<ReportsLifeGroups />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/attendance" element={<Attendance />} />
@@ -42,7 +45,6 @@ function App() {
         <Route path="/attendance/congregation" element={<AttendanceCongregation />} />
         <Route path="/attendance/headcount" element={<AttendanceHeadcount />} />
         <Route path="/attendance/lifegroups" element={<AttendanceLifeGroups />} />
-        <Route path="/attendance/lifegroups/:id" element={<AttendanceLifeGroupDetail />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

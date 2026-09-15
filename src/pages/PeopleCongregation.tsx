@@ -360,7 +360,7 @@ function PeopleCongregation() {
             const page = getCongPage(category);
             const pagedMembers = members.slice((page - 1) * congPageSize, page * congPageSize);
             return (
-              <Card key={category} className="!p-0">
+              <Card key={category} className="!p-0 card-bleed">
                 {congGroupBy !== "none" && (
                   <p className="section-title px-4 pt-4">
                     {category}{" "}
@@ -369,7 +369,8 @@ function PeopleCongregation() {
                     </span>
                   </p>
                 )}
-                <div className={congGroupBy !== "none" ? "mt-2 overflow-x-auto" : "overflow-x-auto"}>
+                {/* Desktop: column table. */}
+                <div className={`hidden min-[900px]:block ${congGroupBy !== "none" ? "mt-2 overflow-x-auto" : "overflow-x-auto"}`}>
                   <div className={congMinWidth}>
                     <div
                       className={`grid ${congGridCols} gap-3 border-b border-[var(--color-border)] px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]`}
@@ -403,6 +404,34 @@ function PeopleCongregation() {
                     ))}
                   </div>
                 </div>
+
+                {/* Mobile: stacked cards — a grid row would force sideways scrolling to see every field. */}
+                <ul className={congGroupBy !== "none" ? "mt-2 min-[900px]:hidden" : "min-[900px]:hidden"}>
+                  {pagedMembers.map((m) => (
+                    <li key={m.id} className="border-b border-[var(--color-border)] px-4 py-3 last:border-b-0">
+                      <div className="flex items-start gap-3">
+                        <InitialAvatar name={m.name} />
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate font-semibold text-[var(--color-text-primary)]">{m.name}</p>
+                          <dl className="mt-2 flex flex-col gap-1 text-sm text-[var(--color-text-secondary)]">
+                            {congVisibleFields.map((f) => (
+                              <div key={f} className="flex gap-1.5">
+                                <dt className="shrink-0 font-semibold text-[var(--color-text-primary)]">
+                                  {congFieldDefs[f].label}:
+                                </dt>
+                                <dd>{congFieldDefs[f].render(m)}</dd>
+                              </div>
+                            ))}
+                          </dl>
+                        </div>
+                        {canManageCongregation && (
+                          <DropdownMenu ariaLabel={`Actions for ${m.name}`} items={buildCongregantMenu(m)} />
+                        )}
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+
                 <Pagination
                   page={page}
                   pageSize={congPageSize}
