@@ -7,7 +7,6 @@ import {
   getLifeGroups,
   getUsers,
   lifeGroupCheckIn,
-  setLifeGroupFirstTimer,
   undoLifeGroupCheckIn,
   type LifeGroupSummary,
   type User,
@@ -56,7 +55,6 @@ function AttendanceLifeGroups() {
     changeGroupDate,
     refreshGroupSession,
     patchGroupMember,
-    patchGroupMemberFirstTimer,
   } = useLifeGroupSessions();
 
   const [addGroupOpen, setAddGroupOpen] = useState(false);
@@ -67,6 +65,7 @@ function AttendanceLifeGroups() {
 
   const [addMemberGroupId, setAddMemberGroupId] = useState<number | null>(null);
   const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberIsFirstTimer, setNewMemberIsFirstTimer] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [followUpGroupId, setFollowUpGroupId] = useState<number | null>(null);
 
@@ -131,8 +130,9 @@ function AttendanceLifeGroups() {
     if (addMemberGroupId === null || !newMemberName.trim()) return;
     setAddingMember(true);
     try {
-      await addLifeGroupMember(addMemberGroupId, newMemberName.trim());
+      await addLifeGroupMember(addMemberGroupId, newMemberName.trim(), newMemberIsFirstTimer);
       setNewMemberName("");
+      setNewMemberIsFirstTimer(false);
       const groupId = addMemberGroupId;
       setAddMemberGroupId(null);
       await loadGroups(true);
@@ -183,13 +183,11 @@ function AttendanceLifeGroups() {
               <Accordion
                 key={group.id}
                 defaultOpen={false}
+                onToggle={(open) => {
+                  if (open && !sessions[group.id] && expandedLoading !== group.id) void loadGroupSession(group);
+                }}
                 header={
-                  <div
-                    className="flex flex-1 items-center justify-between gap-4"
-                    onClick={() => {
-                      if (!sessions[group.id] && expandedLoading !== group.id) void loadGroupSession(group);
-                    }}
-                  >
+                  <div className="flex flex-1 items-center justify-between gap-4">
                     <div>
                       <p className="text-lg font-bold text-[var(--color-navy)]">{group.groupName}</p>
                       <p className="text-sm text-[var(--color-text-secondary)]">
@@ -213,9 +211,7 @@ function AttendanceLifeGroups() {
                   </div>
                 }
               >
-                {expandedLoading === group.id ? (
-                  <Skeleton className="h-16 w-full rounded-md" />
-                ) : session ? (
+                {session ? (
                   <div className="flex flex-col gap-4">
                     <div className="flex flex-wrap items-end justify-between gap-3">
                       {group.category === "Community" ? (
@@ -237,10 +233,6 @@ function AttendanceLifeGroups() {
                       onCheckIn={(memberId) => lifeGroupCheckIn(session.sessionId, memberId)}
                       onUndo={undoLifeGroupCheckIn}
                       onToggled={(memberId, recordId) => patchGroupMember(group.id, memberId, recordId)}
-                      onSetFirstTimer={setLifeGroupFirstTimer}
-                      onFirstTimerToggled={(memberId, isFirstTimer) =>
-                        patchGroupMemberFirstTimer(group.id, memberId, isFirstTimer)
-                      }
                     />
                     <div className="flex flex-wrap gap-3">
                       <Button
@@ -262,7 +254,7 @@ function AttendanceLifeGroups() {
                     </div>
                   </div>
                 ) : (
-                  <p className="helper-text">Tap this section to load attendance.</p>
+                  <Skeleton className="h-16 w-full rounded-md" />
                 )}
               </Accordion>
             );
@@ -320,11 +312,21 @@ function AttendanceLifeGroups() {
 
       <Modal
         open={addMemberGroupId !== null}
-        onClose={() => setAddMemberGroupId(null)}
+        onClose={() => {
+          setAddMemberGroupId(null);
+          setNewMemberIsFirstTimer(false);
+        }}
         title="Add member"
         footer={
           <>
-            <Button type="button" variant="secondary" onClick={() => setAddMemberGroupId(null)}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => {
+                setAddMemberGroupId(null);
+                setNewMemberIsFirstTimer(false);
+              }}
+            >
               Cancel
             </Button>
             <Button type="button" onClick={handleAddMember} disabled={addingMember || !newMemberName.trim()}>
@@ -333,13 +335,23 @@ function AttendanceLifeGroups() {
           </>
         }
       >
-        <TextField
-          label="Full name"
-          value={newMemberName}
-          onChange={(e) => setNewMemberName(e.target.value)}
-          placeholder="Enter their name"
-          autoFocus
-        />
+        <div className="flex flex-col gap-3">
+          <TextField
+            label="Full name"
+            value={newMemberName}
+            onChange={(e) => setNewMemberName(e.target.value)}
+            placeholder="Enter their name"
+            autoFocus
+          />
+          <label className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
+            <input
+              type="checkbox"
+              checked={newMemberIsFirstTimer}
+              onChange={(e) => setNewMemberIsFirstTimer(e.target.checked)}
+            />
+            First-timer
+          </label>
+        </div>
       </Modal>
     </AppShell>
   );

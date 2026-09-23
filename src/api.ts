@@ -15,6 +15,8 @@ export interface User {
   isRegistrar: boolean;
   isActive: boolean;
   birthday: string | null;
+  /** A compressed image as a data URL — see compressImageToDataUrl in utils/imageCompression. */
+  photoDataUrl: string | null;
   ministryIds: number[];
   networkIds: number[];
 }
@@ -26,6 +28,7 @@ export interface UserFormRequest {
   nickname: string | null;
   email: string;
   birthday: string | null;
+  photoDataUrl: string | null;
   ministryIds: number[];
   networkIds: number[];
 }
@@ -197,6 +200,7 @@ export interface UpdateMeRequest {
   nickname: string | null;
   email: string;
   birthday: string | null;
+  photoDataUrl: string | null;
 }
 
 export async function updateMe(profile: UpdateMeRequest): Promise<User> {
@@ -553,6 +557,21 @@ export async function deleteDevotion(id: number): Promise<void> {
   }
 }
 
+export interface DevotionReportRow {
+  userId: number;
+  /** Pre-formatted "Last, First Middle" for this report, matching the paper tracker. */
+  userName: string;
+  dates: string[];
+}
+
+export async function getDevotionMonthlyReport(year: number, month: number): Promise<DevotionReportRow[]> {
+  const res = await apiFetch(`/api/devotions/report/monthly?year=${year}&month=${month}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch Devotions report (${res.status})`);
+  }
+  return res.json();
+}
+
 // ---------- Attendance (Workers / Congregation) ----------
 
 export type RosterScope = "Both" | "Workers" | "Congregation";
@@ -823,6 +842,7 @@ export interface LifeGroupMember {
   id: number;
   lifeGroupId: number;
   name: string;
+  isFirstTimer: boolean;
 }
 
 export interface LifeGroupDetail {
@@ -1029,15 +1049,26 @@ export async function getLifeGroup(id: number): Promise<LifeGroupDetail> {
   return res.json();
 }
 
-export async function addLifeGroupMember(id: number, name: string): Promise<LifeGroupMember> {
+export async function addLifeGroupMember(
+  id: number,
+  name: string,
+  isFirstTimer = false,
+): Promise<LifeGroupMember> {
   const res = await apiFetch(`/api/lifegroups/${id}/members`, {
     method: "POST",
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ name, isFirstTimer }),
   });
   if (!res.ok) {
     throw new Error((await res.text()) || `Failed to add member (${res.status})`);
   }
   return res.json();
+}
+
+export async function removeLifeGroupMember(id: number, memberId: number): Promise<void> {
+  const res = await apiFetch(`/api/lifegroups/${id}/members/${memberId}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to remove member (${res.status})`);
+  }
 }
 
 export async function openLifeGroupSession(id: number, date: string): Promise<LifeGroupSessionInfo> {
@@ -1075,20 +1106,6 @@ export async function undoLifeGroupCheckIn(recordId: number): Promise<void> {
   if (!res.ok) {
     throw new Error(`Failed to remove check-in (${res.status})`);
   }
-}
-
-export async function setLifeGroupFirstTimer(
-  recordId: number,
-  isFirstTimer: boolean,
-): Promise<{ recordId: number; isFirstTimer: boolean }> {
-  const res = await apiFetch(`/api/lifegroups/records/${recordId}/first-timer`, {
-    method: "PUT",
-    body: JSON.stringify({ isFirstTimer }),
-  });
-  if (!res.ok) {
-    throw new Error((await res.text()) || `Failed to update first-timer status (${res.status})`);
-  }
-  return res.json();
 }
 
 export async function getLifeGroupTrend(id: number): Promise<LifeGroupTrendPoint[]> {

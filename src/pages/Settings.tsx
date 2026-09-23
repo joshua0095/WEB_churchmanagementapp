@@ -17,6 +17,7 @@ import {
   getNetworks,
   getUsers,
   MODULES as ACCESS_MODULES,
+  removeLifeGroupMember,
   setEventRosterScope,
   setEventSundayOnly,
   setModuleAccessRule,
@@ -48,7 +49,7 @@ import {
   Tabs,
   TextField,
 } from "../components/ui";
-import { ChevronDownIcon } from "../components/ui/icons";
+import { ChevronDownIcon, TrashIcon } from "../components/ui/icons";
 import {
   buildNetworkTree,
   flattenNetworksForSelect,
@@ -216,6 +217,7 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [membersError, setMembersError] = useState<string | null>(null);
   const [newMemberName, setNewMemberName] = useState("");
+  const [newMemberIsFirstTimer, setNewMemberIsFirstTimer] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
 
@@ -261,8 +263,9 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
     setAddingMember(true);
     setMembersError(null);
     try {
-      await addLifeGroupMember(group.id, newMemberName.trim());
+      await addLifeGroupMember(group.id, newMemberName.trim(), newMemberIsFirstTimer);
       setNewMemberName("");
+      setNewMemberIsFirstTimer(false);
       await loadMembers();
       onMemberAdded();
       successToast("Member added");
@@ -270,6 +273,25 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
       setMembersError(err instanceof Error ? err.message : "Failed to add member");
     } finally {
       setAddingMember(false);
+    }
+  };
+
+  const handleRemoveMember = async (member: LifeGroupMember) => {
+    const confirmed = await confirmDialog({
+      title: "Remove member?",
+      message: `Remove ${member.name} from ${group.groupName}? This also removes their past attendance and follow-up records for this group.`,
+      confirmLabel: "Remove",
+      danger: true,
+    });
+    if (!confirmed) return;
+    setMembersError(null);
+    try {
+      await removeLifeGroupMember(group.id, member.id);
+      await loadMembers();
+      onMemberAdded();
+      successToast("Member removed");
+    } catch (err) {
+      setMembersError(err instanceof Error ? err.message : "Failed to remove member");
     }
   };
 
@@ -311,9 +333,18 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
             <div className="flex flex-col gap-2">
               {members && members.length > 0 ? (
                 members.map((m) => (
-                  <p key={m.id} className="text-sm text-[var(--color-text-secondary)]">
-                    {m.name}
-                  </p>
+                  <div key={m.id} className="flex items-center justify-between gap-2">
+                    <p className="text-sm text-[var(--color-text-secondary)]">{m.name}</p>
+                    <button
+                      type="button"
+                      onClick={() => handleRemoveMember(m)}
+                      aria-label={`Remove ${m.name}`}
+                      title="Remove member"
+                      className="flex shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent p-1 text-[var(--color-text-secondary)] hover:text-[var(--color-danger)]"
+                    >
+                      <TrashIcon className="h-4 w-4" />
+                    </button>
+                  </div>
                 ))
               ) : (
                 <p className="helper-text">No members yet.</p>
@@ -359,6 +390,14 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
                   {addingMember ? "Adding..." : "Add"}
                 </Button>
               </div>
+              <label className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
+                <input
+                  type="checkbox"
+                  checked={newMemberIsFirstTimer}
+                  onChange={(e) => setNewMemberIsFirstTimer(e.target.checked)}
+                />
+                First-timer
+              </label>
               {categoryFilter && (
                 <p className="helper-text">
                   Showing congregation members classified as "{categoryFilter}" for{" "}

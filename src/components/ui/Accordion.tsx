@@ -10,18 +10,29 @@ interface AccordionProps {
    * leader who has only the one Life Group.
    */
   forceOpen?: boolean;
+  /** Fired with the new open state whenever the header is clicked — e.g. to lazily load
+   * content the first time a section opens, regardless of where in the header it's clicked. */
+  onToggle?: (open: boolean) => void;
 }
 
 /** Expandable section — used for each Life Group leader, with members nested inside. */
-function Accordion({ header, children, defaultOpen = false, forceOpen = false }: AccordionProps) {
+function Accordion({ header, children, defaultOpen = false, forceOpen = false, onToggle }: AccordionProps) {
   const [openState, setOpenState] = useState(defaultOpen);
   const open = forceOpen || openState;
+
+  const handleClick = () => {
+    setOpenState((o) => {
+      const next = !o;
+      onToggle?.(next);
+      return next;
+    });
+  };
 
   return (
     <div className="overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] shadow-[var(--shadow-card)]">
       <button
         type="button"
-        onClick={forceOpen ? undefined : () => setOpenState((o) => !o)}
+        onClick={forceOpen ? undefined : handleClick}
         aria-expanded={open}
         aria-disabled={forceOpen || undefined}
         className={[

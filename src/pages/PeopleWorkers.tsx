@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   createUser,
   deleteUser,
@@ -14,7 +15,7 @@ import {
   type User,
 } from "../api";
 import { isAdmin } from "../auth";
-import { InitialAvatar, formatBirthday } from "../components/PeopleShared";
+import { InitialAvatar, PhotoPicker, formatBirthday } from "../components/PeopleShared";
 import {
   buildNetworkTree,
   flattenNetworksForSelect,
@@ -33,6 +34,7 @@ import {
   ProfileMenu,
   SelectField,
   Skeleton,
+  Spinner,
   TextField,
   type DropdownMenuItem,
 } from "../components/ui";
@@ -46,6 +48,7 @@ const emptyUserForm = {
   nickname: "",
   email: "",
   birthday: "",
+  photoDataUrl: null as string | null,
   ministryIds: [] as number[],
   networkIds: [] as number[],
   isRegistrar: false,
@@ -124,6 +127,75 @@ function NetworkPickerNode({
   );
 }
 
+const MAX_VISIBLE_NAMES = 2;
+const TOOLTIP_WIDTH = 240;
+
+/** Renders a list of names, collapsing to "+N more" once a worker belongs to enough
+ * networks/ministries that spelling them all out would clog the row. Hovering (or focusing,
+ * for keyboard users) the "+N more" badge reveals the rest in a floating tooltip.
+ *
+ * The tooltip is rendered through a portal into document.body rather than as a child of the
+ * badge — otherwise the table's `overflow-x-auto` wrapper clips it, per the same CSS overflow
+ * quirk documented on DropdownMenu (setting overflow-x forces overflow-y to auto too). */
+function NameListCell({ ids, nameById }: { ids: number[]; nameById: (id: number) => string }) {
+  const [open, setOpen] = useState(false);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+  const triggerRef = useRef<HTMLSpanElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const hide = () => setOpen(false);
+    window.addEventListener("scroll", hide, true);
+    window.addEventListener("resize", hide);
+    return () => {
+      window.removeEventListener("scroll", hide, true);
+      window.removeEventListener("resize", hide);
+    };
+  }, [open]);
+
+  if (ids.length === 0) return <>—</>;
+  const names = ids.map(nameById);
+  if (names.length <= MAX_VISIBLE_NAMES) return <>{names.join(", ")}</>;
+
+  const remaining = names.length - MAX_VISIBLE_NAMES;
+
+  const show = () => {
+    const rect = triggerRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setPosition({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - TOOLTIP_WIDTH - 8) });
+    setOpen(true);
+  };
+
+  return (
+    <span>
+      {names.slice(0, MAX_VISIBLE_NAMES).join(", ")}{" "}
+      <span
+        ref={triggerRef}
+        tabIndex={0}
+        onMouseEnter={show}
+        onMouseLeave={() => setOpen(false)}
+        onFocus={show}
+        onBlur={() => setOpen(false)}
+        className="cursor-default font-semibold text-[var(--color-text-secondary)] underline decoration-dotted underline-offset-2"
+      >
+        +{remaining} more
+      </span>
+      {open &&
+        position &&
+        createPortal(
+          <div
+            role="tooltip"
+            style={{ position: "fixed", top: position.top, left: position.left, width: TOOLTIP_WIDTH }}
+            className="z-50 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] shadow-lg"
+          >
+            {names.join(", ")}
+          </div>,
+          document.body,
+        )}
+    </span>
+  );
+}
+
 function PeopleWorkers() {
   const [search, setSearch] = useState("");
   const [ministryFilter, setMinistryFilter] = useState("");
@@ -153,15 +225,21 @@ function PeopleWorkers() {
   const [savingUser, setSavingUser] = useState(false);
   const [userFormError, setUserFormError] = useState<string | null>(null);
 
-  const loadUsers = async () => {
-    setLoadingUsers(true);
+  // Which row shows the "updating" pulse — set right before a per-row mutation (save/toggle/
+  // delete) and cleared once the silent reload picks it back up.
+  const [busyUserId, setBusyUserId] = useState<number | string | null>(null);
+
+  // `silent` skips the loading skeleton for a background refresh (e.g. after editing a worker)
+  // — otherwise the whole list would flicker to a skeleton and lose your page/scroll position.
+  const loadUsers = async (silent = false) => {
+    if (!silent) setLoadingUsers(true);
     setUsersError(null);
     try {
       setUsers(await getUsers());
     } catch (err) {
       setUsersError(err instanceof Error ? err.message : "Failed to load workers");
     } finally {
-      setLoadingUsers(false);
+      if (!silent) setLoadingUsers(false);
     }
   };
 
@@ -178,8 +256,10 @@ function PeopleWorkers() {
       });
   }, []);
 
-  const networkNameById = (id: number) => networks.find((n) => n.id === id)?.name ?? `#${id}`;
-  const ministryNameById = (id: number) => ministries.find((m) => m.id === id)?.name ?? `#${id}`;
+  const networkNameMap = useMemo(() => new Map(networks.map((n) => [n.id, n.name])), [networks]);
+  const ministryNameMap = useMemo(() => new Map(ministries.map((m) => [m.id, m.name])), [ministries]);
+  const networkNameById = (id: number) => networkNameMap.get(id) ?? `#${id}`;
+  const ministryNameById = (id: number) => ministryNameMap.get(id) ?? `#${id}`;
 
   const networkTree = useMemo(() => buildNetworkTree(networks, ministries), [networks, ministries]);
   const networkSelectOptions = useMemo(() => flattenNetworksForSelect(networkTree), [networkTree]);
@@ -223,6 +303,7 @@ function PeopleWorkers() {
       nickname: u.nickname ?? "",
       email: u.email,
       birthday: u.birthday ? u.birthday.slice(0, 10) : "",
+      photoDataUrl: u.photoDataUrl,
       ministryIds: u.ministryIds,
       networkIds: u.networkIds,
       isRegistrar: u.isRegistrar,
@@ -284,6 +365,7 @@ function PeopleWorkers() {
         nickname: userForm.nickname.trim() || null,
         email: userForm.email.trim(),
         birthday: userForm.birthday || null,
+        photoDataUrl: userForm.photoDataUrl,
         ministryIds: userForm.ministryIds,
         networkIds: userForm.networkIds,
       };
@@ -292,7 +374,7 @@ function PeopleWorkers() {
         const result = await createUser(payload);
         await setUserRegistrar(result.user.id, userForm.isRegistrar);
         setUserModalOpen(false);
-        await loadUsers();
+        await loadUsers(true);
         await infoAlert(
           `Temporary password: ${result.temporaryPassword}\n\nShare this with ${result.user.name} so they can log in. They should change it from Settings afterward.`,
           "Worker created",
@@ -301,13 +383,15 @@ function PeopleWorkers() {
         await updateUser(editingUserId, payload);
         await setUserRegistrar(editingUserId, userForm.isRegistrar);
         setUserModalOpen(false);
-        await loadUsers();
+        setBusyUserId(editingUserId);
+        await loadUsers(true);
         successToast("Worker updated");
       }
     } catch (err) {
       setUserFormError(err instanceof Error ? err.message : "Failed to save worker");
     } finally {
       setSavingUser(false);
+      setBusyUserId(null);
     }
   };
 
@@ -340,12 +424,15 @@ function PeopleWorkers() {
       danger: !activating,
     });
     if (!confirmed) return;
+    setBusyUserId(u.id);
     try {
       await setUserActive(u.id, activating);
-      await loadUsers();
+      await loadUsers(true);
       successToast(activating ? "Worker activated" : "Worker deactivated");
     } catch (err) {
       await infoAlert(err instanceof Error ? err.message : "Failed to update account status", "Error");
+    } finally {
+      setBusyUserId(null);
     }
   };
 
@@ -357,12 +444,15 @@ function PeopleWorkers() {
       danger: true,
     });
     if (!confirmed) return;
+    setBusyUserId(u.id);
     try {
       await deleteUser(u.id);
-      await loadUsers();
+      await loadUsers(true);
       successToast("Worker deleted");
     } catch (err) {
       await infoAlert(err instanceof Error ? err.message : "Failed to delete worker", "Error");
+    } finally {
+      setBusyUserId(null);
     }
   };
 
@@ -450,10 +540,15 @@ function PeopleWorkers() {
               {pagedUsers.map((u) => (
                 <div
                   key={u.id}
-                  className="grid grid-cols-[2fr_1.4fr_1.6fr_1fr_48px] items-center gap-3 border-b border-[var(--color-border)] px-4 py-3 last:border-b-0"
+                  className={[
+                    "grid grid-cols-[2fr_1.4fr_1.6fr_1fr_48px] items-center gap-3 border-b border-[var(--color-border)] px-4 py-3 last:border-b-0 transition-opacity",
+                    u.id === busyUserId && "pointer-events-none animate-pulse opacity-60",
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 >
                   <div className="flex items-center gap-3">
-                    <InitialAvatar name={u.name} />
+                    <InitialAvatar name={u.name} photoUrl={u.photoDataUrl} />
                     <div className="min-w-0">
                       <p className="truncate font-semibold text-[var(--color-text-primary)]">{u.name}</p>
                       <p className="truncate text-xs text-[var(--color-text-secondary)]">{u.email}</p>
@@ -465,13 +560,15 @@ function PeopleWorkers() {
                     )}
                   </div>
                   <div className="text-sm text-[var(--color-text-secondary)]">
-                    {u.networkIds.length > 0 ? u.networkIds.map(networkNameById).join(", ") : "—"}
+                    <NameListCell ids={u.networkIds} nameById={networkNameById} />
                   </div>
                   <div className="text-sm text-[var(--color-text-secondary)]">
-                    {u.ministryIds.length > 0 ? u.ministryIds.map(ministryNameById).join(", ") : "—"}
+                    <NameListCell ids={u.ministryIds} nameById={ministryNameById} />
                   </div>
                   <div className="text-sm text-[var(--color-text-secondary)]">{formatBirthday(u.birthday)}</div>
-                  {canManageUsers ? (
+                  {u.id === busyUserId ? (
+                    <Spinner className="h-4 w-4 text-[var(--color-text-secondary)]" />
+                  ) : canManageUsers ? (
                     <DropdownMenu ariaLabel={`Actions for ${u.name}`} items={buildUserMenu(u)} />
                   ) : (
                     <span />
@@ -484,9 +581,17 @@ function PeopleWorkers() {
           {/* Mobile: stacked cards — a grid row would force sideways scrolling to see every field. */}
           <ul className="min-[900px]:hidden">
             {pagedUsers.map((u) => (
-              <li key={u.id} className="border-b border-[var(--color-border)] px-4 py-3 last:border-b-0">
+              <li
+                key={u.id}
+                className={[
+                  "border-b border-[var(--color-border)] px-4 py-3 last:border-b-0 transition-opacity",
+                  u.id === busyUserId && "pointer-events-none animate-pulse opacity-60",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+              >
                 <div className="flex items-start gap-3">
-                  <InitialAvatar name={u.name} />
+                  <InitialAvatar name={u.name} photoUrl={u.photoDataUrl} />
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="truncate font-semibold text-[var(--color-text-primary)]">{u.name}</p>
@@ -496,23 +601,34 @@ function PeopleWorkers() {
                         </span>
                       )}
                     </div>
-                    <p className="truncate text-xs text-[var(--color-text-secondary)]">{u.email}</p>
-                    <dl className="mt-2 flex flex-col gap-1 text-sm text-[var(--color-text-secondary)]">
-                      <div className="flex gap-1.5">
-                        <dt className="shrink-0 font-semibold text-[var(--color-text-primary)]">Network:</dt>
-                        <dd>{u.networkIds.length > 0 ? u.networkIds.map(networkNameById).join(", ") : "—"}</dd>
+                    <div className="flex items-baseline gap-1.5 text-xs text-[var(--color-text-secondary)]">
+                      <p className="min-w-0 flex-1 truncate">{u.email}</p>
+                      {u.birthday && <p className="shrink-0">{formatBirthday(u.birthday)}</p>}
+                    </div>
+                    <dl className="mt-1.5 flex flex-col gap-1 text-sm">
+                      <div className="flex flex-wrap items-baseline gap-x-1.5">
+                        <dt className="shrink-0 text-[0.68rem] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                          Network
+                        </dt>
+                        <dd className="text-[var(--color-text-primary)]">
+                          <NameListCell ids={u.networkIds} nameById={networkNameById} />
+                        </dd>
                       </div>
-                      <div className="flex gap-1.5">
-                        <dt className="shrink-0 font-semibold text-[var(--color-text-primary)]">Ministry:</dt>
-                        <dd>{u.ministryIds.length > 0 ? u.ministryIds.map(ministryNameById).join(", ") : "—"}</dd>
-                      </div>
-                      <div className="flex gap-1.5">
-                        <dt className="shrink-0 font-semibold text-[var(--color-text-primary)]">Birthday:</dt>
-                        <dd>{formatBirthday(u.birthday)}</dd>
+                      <div className="flex flex-wrap items-baseline gap-x-1.5">
+                        <dt className="shrink-0 text-[0.68rem] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                          Ministry
+                        </dt>
+                        <dd className="text-[var(--color-text-primary)]">
+                          <NameListCell ids={u.ministryIds} nameById={ministryNameById} />
+                        </dd>
                       </div>
                     </dl>
                   </div>
-                  {canManageUsers && <DropdownMenu ariaLabel={`Actions for ${u.name}`} items={buildUserMenu(u)} />}
+                  {u.id === busyUserId ? (
+                    <Spinner className="mt-1 h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" />
+                  ) : (
+                    canManageUsers && <DropdownMenu ariaLabel={`Actions for ${u.name}`} items={buildUserMenu(u)} />
+                  )}
                 </div>
               </li>
             ))}
@@ -549,6 +665,11 @@ function PeopleWorkers() {
         }
       >
         <div className="flex flex-col gap-4">
+          <PhotoPicker
+            name={`${userForm.firstName} ${userForm.lastName}`.trim() || "Worker"}
+            photoUrl={userForm.photoDataUrl}
+            onChange={(photoDataUrl) => setUserForm((f) => ({ ...f, photoDataUrl }))}
+          />
           <TextField
             label="First name"
             value={userForm.firstName}

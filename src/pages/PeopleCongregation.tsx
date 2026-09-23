@@ -21,6 +21,7 @@ import {
   SelectField,
   TextField,
   Skeleton,
+  Spinner,
   type DropdownMenuItem,
 } from "../components/ui";
 import { getPageSize, setPageSize } from "../preferences";
@@ -70,15 +71,22 @@ function PeopleCongregation() {
   const [savingCongregant, setSavingCongregant] = useState(false);
   const [congregantFormError, setCongregantFormError] = useState<string | null>(null);
 
-  const loadCongregation = async () => {
-    setLoadingCongregation(true);
+  // Which row shows the "updating" pulse — set right before a per-row mutation (save/delete)
+  // and cleared once the silent reload picks it back up.
+  const [busyCongregantId, setBusyCongregantId] = useState<number | null>(null);
+
+  // `silent` skips the loading skeleton for a background refresh (e.g. after editing a
+  // member) — otherwise the whole list would flicker to a skeleton and lose your page/scroll
+  // position.
+  const loadCongregation = async (silent = false) => {
+    if (!silent) setLoadingCongregation(true);
     setCongregationError(null);
     try {
       setCongregation(await getCongregation());
     } catch (err) {
       setCongregationError(err instanceof Error ? err.message : "Failed to load congregation");
     } finally {
-      setLoadingCongregation(false);
+      if (!silent) setLoadingCongregation(false);
     }
   };
 
@@ -214,11 +222,13 @@ function PeopleCongregation() {
         successToast("Congregation member updated");
       }
       setCongregantModalOpen(false);
-      await loadCongregation();
+      setBusyCongregantId(editingCongregantId);
+      await loadCongregation(true);
     } catch (err) {
       setCongregantFormError(err instanceof Error ? err.message : "Failed to save");
     } finally {
       setSavingCongregant(false);
+      setBusyCongregantId(null);
     }
   };
 
@@ -230,12 +240,15 @@ function PeopleCongregation() {
       danger: true,
     });
     if (!confirmed) return;
+    setBusyCongregantId(m.id);
     try {
       await deleteCongregant(m.id);
-      await loadCongregation();
+      await loadCongregation(true);
       successToast("Congregation member deleted");
     } catch (err) {
       await infoAlert(err instanceof Error ? err.message : "Failed to delete", "Error");
+    } finally {
+      setBusyCongregantId(null);
     }
   };
 
@@ -384,7 +397,12 @@ function PeopleCongregation() {
                     {pagedMembers.map((m) => (
                       <div
                         key={m.id}
-                        className={`grid ${congGridCols} items-center gap-3 border-b border-[var(--color-border)] px-4 py-3 last:border-b-0`}
+                        className={[
+                          `grid ${congGridCols} items-center gap-3 border-b border-[var(--color-border)] px-4 py-3 last:border-b-0 transition-opacity`,
+                          m.id === busyCongregantId && "pointer-events-none animate-pulse opacity-60",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                       >
                         <div className="flex items-center gap-3">
                           <InitialAvatar name={m.name} />
@@ -395,7 +413,9 @@ function PeopleCongregation() {
                             {congFieldDefs[f].render(m)}
                           </div>
                         ))}
-                        {canManageCongregation ? (
+                        {m.id === busyCongregantId ? (
+                          <Spinner className="h-4 w-4 text-[var(--color-text-secondary)]" />
+                        ) : canManageCongregation ? (
                           <DropdownMenu ariaLabel={`Actions for ${m.name}`} items={buildCongregantMenu(m)} />
                         ) : (
                           <span />
@@ -408,24 +428,36 @@ function PeopleCongregation() {
                 {/* Mobile: stacked cards — a grid row would force sideways scrolling to see every field. */}
                 <ul className={congGroupBy !== "none" ? "mt-2 min-[900px]:hidden" : "min-[900px]:hidden"}>
                   {pagedMembers.map((m) => (
-                    <li key={m.id} className="border-b border-[var(--color-border)] px-4 py-3 last:border-b-0">
+                    <li
+                      key={m.id}
+                      className={[
+                        "border-b border-[var(--color-border)] px-4 py-3 last:border-b-0 transition-opacity",
+                        m.id === busyCongregantId && "pointer-events-none animate-pulse opacity-60",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
+                    >
                       <div className="flex items-start gap-3">
                         <InitialAvatar name={m.name} />
                         <div className="min-w-0 flex-1">
                           <p className="truncate font-semibold text-[var(--color-text-primary)]">{m.name}</p>
-                          <dl className="mt-2 flex flex-col gap-1 text-sm text-[var(--color-text-secondary)]">
+                          <dl className="mt-1.5 grid grid-cols-2 gap-x-3 gap-y-1 text-sm">
                             {congVisibleFields.map((f) => (
-                              <div key={f} className="flex gap-1.5">
-                                <dt className="shrink-0 font-semibold text-[var(--color-text-primary)]">
-                                  {congFieldDefs[f].label}:
+                              <div key={f} className="flex flex-wrap items-baseline gap-x-1.5">
+                                <dt className="shrink-0 text-[0.68rem] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
+                                  {congFieldDefs[f].label}
                                 </dt>
-                                <dd>{congFieldDefs[f].render(m)}</dd>
+                                <dd className="truncate text-[var(--color-text-primary)]">{congFieldDefs[f].render(m)}</dd>
                               </div>
                             ))}
                           </dl>
                         </div>
-                        {canManageCongregation && (
-                          <DropdownMenu ariaLabel={`Actions for ${m.name}`} items={buildCongregantMenu(m)} />
+                        {m.id === busyCongregantId ? (
+                          <Spinner className="mt-1 h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" />
+                        ) : (
+                          canManageCongregation && (
+                            <DropdownMenu ariaLabel={`Actions for ${m.name}`} items={buildCongregantMenu(m)} />
+                          )
                         )}
                       </div>
                     </li>

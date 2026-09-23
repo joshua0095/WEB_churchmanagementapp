@@ -38,6 +38,20 @@ function Modal({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
+  // Locks the page behind the modal from scrolling while it's open. Saving/restoring
+  // whatever overflow value was already there (rather than always resetting to "") keeps
+  // this correct even when a modal opens another modal on top of itself (e.g. the photo
+  // cropper opened from within the worker edit form) — the inner one's cleanup hands
+  // control back to the outer one's "hidden" instead of clobbering it.
+  useEffect(() => {
+    if (!open) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+    };
+  }, [open]);
+
   if (!open) return null;
 
   const large = size === "lg";

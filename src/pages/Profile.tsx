@@ -10,8 +10,8 @@ import {
   type Network,
   type User,
 } from "../api";
-import { InitialAvatar } from "../components/PeopleShared";
-import { AppShell, Button, Card, ProfileMenu, Skeleton, TextField } from "../components/ui";
+import { InitialAvatar, PhotoPicker } from "../components/PeopleShared";
+import { AppShell, Button, Card, ProfileMenu, Skeleton, TextField, setCachedMe } from "../components/ui";
 import { successToast } from "../swal";
 
 const emptyForm = { firstName: "", middleName: "", lastName: "", nickname: "", email: "", birthday: "" };
@@ -29,6 +29,7 @@ function Profile() {
   const [error, setError] = useState<string | null>(null);
 
   const [form, setForm] = useState(emptyForm);
+  const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
@@ -54,6 +55,7 @@ function Profile() {
         email: meRes.email,
         birthday: meRes.birthday ? meRes.birthday.slice(0, 10) : "",
       });
+      setPhotoDataUrl(meRes.photoDataUrl);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load your profile");
     } finally {
@@ -80,8 +82,10 @@ function Profile() {
         nickname: form.nickname.trim() || null,
         email: form.email.trim(),
         birthday: form.birthday || null,
+        photoDataUrl,
       });
       setMe(updated);
+      setCachedMe({ name: updated.name, photoDataUrl: updated.photoDataUrl });
       successToast("Profile updated");
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to update your profile");
@@ -110,7 +114,7 @@ function Profile() {
         <div className="page-sections">
           <Card>
             <div className="profile-header">
-              <InitialAvatar name={me.name} />
+              <InitialAvatar name={me.name} photoUrl={photoDataUrl} size="lg" />
               <div>
                 <p className="profile-name">{me.name}</p>
                 <p className="profile-email">{me.email}</p>
@@ -127,6 +131,7 @@ function Profile() {
             <Card>
               <h2 className="section-title" style={{ marginBottom: "5px" }}>Edit Profile</h2>
               <div className="flex flex-col gap-4 sm:max-w-sm">
+                <PhotoPicker name={me.name} photoUrl={photoDataUrl} onChange={setPhotoDataUrl} />
                 <TextField
                   label="First name"
                   value={form.firstName}

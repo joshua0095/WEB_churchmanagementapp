@@ -67,6 +67,16 @@ h3 {
   margin: 0;
 }
 
+/* Preflight is skipped (see the top-of-file note), so this is what actually strips the
+   browser's default bullet/number marker and indent from every <ul>/<ol> in the app —
+   individual lists opt back into a marker explicitly if they ever need one. */
+ul,
+ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
 a {
   color: var(--color-info);
 }

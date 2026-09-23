@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { isAdmin, isRegistrar } from "../auth";
 import { AppShell, Card, ProfileMenu } from "../components/ui";
-import { LifeGroupIcon, ReportsIcon } from "../components/ui/icons";
+import { DevotionIcon, LifeGroupIcon, ReportsIcon } from "../components/ui/icons";
 
 function Reports() {
   const navigate = useNavigate();
@@ -46,6 +46,17 @@ function Reports() {
           <Card className="flex items-center gap-3 !p-5">
             <LifeGroupIcon className="h-6 w-6 shrink-0 text-[var(--color-navy)]" />
             <span className="font-display text-lg font-bold text-[var(--color-navy)]">Life Groups</span>
+          </Card>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => navigate("/reports/devotions")}
+          className="cursor-pointer border-0 bg-transparent p-0 text-left"
+        >
+          <Card className="flex items-center gap-3 !p-5">
+            <DevotionIcon className="h-6 w-6 shrink-0 text-[var(--color-navy)]" />
+            <span className="font-display text-lg font-bold text-[var(--color-navy)]">Devotions</span>
           </Card>
         </button>
       </div>

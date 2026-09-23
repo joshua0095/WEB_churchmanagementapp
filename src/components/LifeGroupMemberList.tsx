@@ -1,6 +1,6 @@
 import type { LifeGroupPerson } from "../api";
 import { confirmDialog } from "../swal";
-import { CheckedIcon, CheckIcon, StarIcon } from "./ui/icons";
+import { CheckedIcon, CheckIcon } from "./ui/icons";
 
 interface LifeGroupMemberListProps {
   people: LifeGroupPerson[];
@@ -9,21 +9,10 @@ interface LifeGroupMemberListProps {
   /** Called with the new recordId (or null once undone) so the parent can patch its
    * roster state directly — avoids a full roster re-fetch just to reflect one toggle. */
   onToggled: (memberId: number, recordId: number | null) => void;
-  onSetFirstTimer: (recordId: number, isFirstTimer: boolean) => Promise<unknown>;
-  /** Called after a first-timer toggle succeeds, so the parent can patch its roster state. */
-  onFirstTimerToggled: (memberId: number, isFirstTimer: boolean) => void;
 }
 
-/** Present/absent list for one Life Group's session — a checkmark toggle, plus a
- * first-timer star once someone's checked in. */
-function LifeGroupMemberList({
-  people,
-  onCheckIn,
-  onUndo,
-  onToggled,
-  onSetFirstTimer,
-  onFirstTimerToggled,
-}: LifeGroupMemberListProps) {
+/** Present/absent list for one Life Group's session — a simple checkmark toggle per member. */
+function LifeGroupMemberList({ people, onCheckIn, onUndo, onToggled }: LifeGroupMemberListProps) {
   const handleToggle = async (person: LifeGroupPerson) => {
     if (person.recordId) {
       const confirmed = await confirmDialog({
@@ -41,13 +30,6 @@ function LifeGroupMemberList({
     }
   };
 
-  const handleToggleFirstTimer = async (person: LifeGroupPerson) => {
-    if (!person.recordId) return;
-    const next = !person.isFirstTimer;
-    await onSetFirstTimer(person.recordId, next);
-    onFirstTimerToggled(person.memberId, next);
-  };
-
   if (people.length === 0) {
     return <p className="helper-text">No members in this group yet.</p>;
   }
@@ -62,24 +44,6 @@ function LifeGroupMemberList({
           <div className="flex flex-1 items-center px-5 py-3">
             <span className="text-base font-bold text-[var(--color-navy)]">{person.name}</span>
           </div>
-          {person.recordId && (
-            <button
-              type="button"
-              onClick={() => handleToggleFirstTimer(person)}
-              aria-label={
-                person.isFirstTimer ? `Unmark ${person.name} as first-timer` : `Mark ${person.name} as first-timer`
-              }
-              title="First-timer"
-              className={[
-                "flex w-14 shrink-0 items-center justify-center border-none border-l border-l-[var(--color-border)] outline-none transition-colors focus-visible:shadow-[0_0_0_3px_rgba(242,183,5,0.5)]",
-                person.isFirstTimer
-                  ? "bg-[var(--color-navy)] text-[var(--color-gold)]"
-                  : "bg-transparent text-[var(--color-text-secondary)]/40 hover:bg-black/5",
-              ].join(" ")}
-            >
-              <StarIcon className="h-5 w-5" fill={person.isFirstTimer ? "currentColor" : "none"} />
-            </button>
-          )}
           <button
             type="button"
             onClick={() => handleToggle(person)}

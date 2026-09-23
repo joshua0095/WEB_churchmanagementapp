@@ -92,23 +92,6 @@ export function useLifeGroupSessions() {
     });
   };
 
-  const patchGroupMemberFirstTimer = (groupId: number, memberId: number, isFirstTimer: boolean) => {
-    setSessions((prev) => {
-      const existing = prev[groupId];
-      if (!existing) return prev;
-      return {
-        ...prev,
-        [groupId]: {
-          ...existing,
-          roster: {
-            ...existing.roster,
-            people: existing.roster.people.map((p) => (p.memberId === memberId ? { ...p, isFirstTimer } : p)),
-          },
-        },
-      };
-    });
-  };
-
   return {
     sessions,
     groupDates,
@@ -119,6 +102,5 @@ export function useLifeGroupSessions() {
     changeGroupDate,
     refreshGroupSession,
     patchGroupMember,
-    patchGroupMemberFirstTimer,
   };
 }

@@ -321,9 +321,22 @@
 .profile-menu {
   position: relative;
 }
+/* Bigger than the other topbar icon buttons on purpose — a negative bottom margin keeps its
+ * flow height matching a normal .ui-icon-btn (so it doesn't inflate the topbar), while the
+ * button itself paints past that boundary, overlapping the page content below it. */
+.profile-menu-trigger {
+  width: 3.5rem;
+  height: 3.5rem;
+  margin-bottom: -1.5rem;
+  border: 3px solid var(--color-surface);
+  box-shadow: var(--shadow-pop);
+  position: relative;
+  z-index: 11;
+}
 .profile-menu-dropdown {
   position: absolute;
-  top: calc(100% + 0.5rem);
+  /* Offset past .profile-menu-trigger's overhang (1.5rem) plus the usual 0.5rem gap. */
+  top: calc(100% + 2rem);
   right: 0;
   min-width: 160px;
   background: var(--color-surface);
@@ -357,8 +370,10 @@
 /* ---------- Profile page ---------- */
 .profile-header {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 0.85rem;
+  text-align: center;
+  gap: 0.6rem;
 }
 .profile-name {
   margin: 0;
@@ -374,6 +389,7 @@
 .profile-badges {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 0.35rem;
   margin-top: 0.5rem;
 }
@@ -570,7 +586,11 @@
 
 /* ---------- Auth layout ---------- */
 .auth-page {
-  min-height: 100vh;
+  min-height: 100vh; /* fallback for browsers without dvh support */
+  /* On mobile, 100vh is the viewport height with the address bar hidden — taller than what's
+     actually visible while it's showing, so the centered card sits above true-center until the
+     bar collapses. 100dvh tracks the real visible height as the bar shows/hides. */
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -16,6 +16,7 @@ import PeopleWorkers from "./pages/PeopleWorkers";
 import Profile from "./pages/Profile";
 import Reports from "./pages/Reports";
 import ReportsCongregation from "./pages/ReportsCongregation";
+import ReportsDevotions from "./pages/ReportsDevotions";
 import ReportsLifeGroups from "./pages/ReportsLifeGroups";
 import ResetPassword from "./pages/ResetPassword";
 import Settings from "./pages/Settings";
@@ -38,6 +39,7 @@ function App() {
         <Route path="/reports" element={<Reports />} />
         <Route path="/reports/congregation" element={<ReportsCongregation />} />
         <Route path="/reports/lifegroups" element={<ReportsLifeGroups />} />
+        <Route path="/reports/devotions" element={<ReportsDevotions />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/attendance" element={<Attendance />} />
