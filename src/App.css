@@ -17,6 +17,16 @@
     }
   }
 
+  /* Below 1024px the app shell trades its sidebar for a fixed bottom tab bar (see
+     .app-bottom-nav in ui.css) — this keeps page content from ending up underneath it.
+     Comes after the min-width:900px rule above so it still wins padding-bottom in the
+     900-1023px overlap instead of being reset by that rule's shorthand `padding`. */
+  @media (max-width: 1023px) {
+    .page {
+      padding-bottom: calc(4.5rem + env(safe-area-inset-bottom, 0px));
+    }
+  }
+
   /* Lets a card bleed edge-to-edge on mobile (matching the .page side padding it
      cancels out) so list cards like Workers/Congregation use the full viewport
      width instead of floating with margins on small screens. */

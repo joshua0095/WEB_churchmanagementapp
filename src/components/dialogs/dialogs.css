@@ -1,0 +1,530 @@
+/* ---------- Modal ---------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--color-backdrop);
+  opacity: 0;
+  transition: opacity 0.18s ease;
+}
+.modal-backdrop--open {
+  opacity: 1;
+}
+.modal {
+  position: relative;
+  width: 100%;
+  max-height: calc(100vh - 48px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  border-radius: 20px;
+  box-shadow: 0 24px 64px rgba(18, 32, 61, 0.32);
+  transform: translateY(8px) scale(0.98);
+  transition: transform 0.18s ease;
+}
+.modal-backdrop--open .modal {
+  transform: none;
+}
+.modal--sm {
+  max-width: 440px;
+}
+.modal--md {
+  max-width: 560px;
+}
+
+.modal-ribbon {
+  position: absolute;
+  top: 0;
+  left: 28px;
+  width: 12px;
+  height: 32px;
+  background: var(--color-gold);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+}
+.modal-ribbon--right {
+  left: auto;
+  right: 36px;
+}
+.modal-handle {
+  display: none;
+}
+
+.modal-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 48px 20px 20px 28px;
+}
+.modal-header-text {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.modal-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.5rem;
+  color: var(--color-text-primary);
+}
+.modal-desc {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+.modal-close {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.modal-close svg {
+  width: 18px;
+  height: 18px;
+}
+
+.modal-body {
+  padding: 4px 28px 28px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  overflow-y: auto;
+}
+.modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 16px 28px;
+  background: var(--color-bg-soft);
+  border-top: 1px solid var(--color-line);
+}
+
+/* Confirm variant */
+.modal--confirm .modal-header {
+  padding: 28px 28px 24px;
+}
+.modal--confirm .modal-title {
+  font-size: 1.3125rem;
+}
+.modal--confirm .modal-desc {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.modal-icon-tile {
+  width: 48px;
+  height: 48px;
+  flex-shrink: 0;
+  border-radius: 14px;
+  background: var(--color-bg);
+  color: var(--color-navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-icon-tile svg {
+  width: 22px;
+  height: 22px;
+}
+.modal-icon-tile--danger {
+  background: var(--color-danger-tint);
+  color: var(--color-danger);
+}
+
+/* Success variant */
+.modal--success .modal-header {
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 10px;
+  padding: 36px 32px 28px;
+}
+.modal--success .modal-desc {
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+.modal-check-circle {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--color-navy);
+  color: var(--color-gold);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.modal-check-circle svg {
+  width: 26px;
+  height: 26px;
+}
+.modal--success .modal-footer {
+  background: transparent;
+  border-top: none;
+  padding: 0 28px 28px;
+}
+.modal--success .modal-footer button {
+  width: 100%;
+  height: 48px;
+}
+
+/* Form fields inside a modal use this sizing regardless of context elsewhere in the app —
+   TextField/SelectField's own ui-field-input, plus any plain <select>/<textarea>. */
+.modal-body .ui-field-input,
+.modal-body select,
+.modal-body textarea {
+  height: 48px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-line-strong);
+  font-size: 0.9375rem;
+}
+.modal-body textarea {
+  height: 88px;
+  padding: 12px 14px;
+  resize: none;
+}
+.modal-body .ui-segmented {
+  height: 48px;
+}
+
+/* ---------- MOBILE: every modal becomes a bottom sheet ---------- */
+@media (max-width: 1023px) {
+  .modal-backdrop {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .modal,
+  .modal--sm,
+  .modal--md {
+    max-width: none;
+    max-height: 92vh;
+    border-radius: 24px 24px 0 0;
+    box-shadow: 0 -12px 40px rgba(18, 32, 61, 0.25);
+    transform: translateY(100%);
+    transition: transform 0.24s ease;
+  }
+  .modal-backdrop--open .modal {
+    transform: none;
+  }
+  .modal-handle {
+    display: flex;
+    justify-content: center;
+    padding-top: 10px;
+  }
+  .modal-handle span {
+    width: 40px;
+    height: 5px;
+    border-radius: 999px;
+    background: var(--color-line-strong);
+  }
+  .modal-ribbon {
+    left: 24px;
+    height: 30px;
+  }
+  .modal-ribbon--right {
+    left: auto;
+    right: 32px;
+  }
+  .modal-header {
+    padding: 22px 16px 16px 24px;
+  }
+  .modal-title {
+    font-size: 1.375rem;
+  }
+  .modal-close {
+    width: 44px;
+    height: 44px;
+    border-radius: 12px;
+  }
+  .modal-body {
+    padding: 4px 24px 20px;
+    gap: 16px;
+  }
+  .modal-body .ui-field-input,
+  .modal-body select,
+  .modal-body textarea {
+    height: 52px;
+    border-radius: 12px;
+    font-size: 1rem; /* 16px stops iOS zoom on focus */
+  }
+  .modal-body .ui-segmented {
+    height: 52px;
+  }
+  .modal-body .grid-2,
+  .modal-body .sm\:grid-cols-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 8px;
+    padding: 16px 24px calc(28px + env(safe-area-inset-bottom, 0px));
+    background: var(--color-surface);
+  }
+  .modal-footer button {
+    width: 100%;
+    height: 54px;
+    border-radius: 12px;
+    font-size: 1rem;
+  }
+  /* Cancel becomes a plain text button on mobile — targets Button's "outline" variant via
+     its data-variant hook, since that's how every Cancel button in this app is styled. */
+  .modal-footer button[data-variant="outline"] {
+    height: 48px;
+    border: none;
+    background: transparent;
+  }
+
+  .modal--confirm .modal-header {
+    flex-direction: column;
+    gap: 14px;
+    padding: 22px 24px 24px;
+  }
+  .modal--confirm .modal-title {
+    font-size: 1.375rem;
+  }
+  .modal--confirm .modal-desc,
+  .modal--success .modal-desc {
+    font-size: 1rem;
+  }
+  .modal-icon-tile {
+    width: 52px;
+    height: 52px;
+  }
+  .modal--success .modal-header {
+    padding: 28px 28px 24px;
+  }
+  .modal--success .modal-footer {
+    padding: 8px 24px calc(28px + env(safe-area-inset-bottom, 0px));
+  }
+  .modal--success .modal-footer button {
+    height: 54px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .modal,
+  .modal-backdrop,
+  .toast {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+
+/* ---------- Toasts / alerts ---------- */
+.toast-stack {
+  position: fixed;
+  z-index: 200;
+  top: calc(var(--app-topbar-height, 72px) + 1rem);
+  right: 24px;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  pointer-events: none;
+}
+.toast {
+  pointer-events: auto;
+  position: relative;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  box-shadow: 0 12px 32px rgba(18, 32, 61, 0.16);
+  animation: toast-in 0.2s ease;
+}
+.toast--leaving {
+  animation: toast-out 0.18s ease forwards;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateX(16px);
+  }
+}
+.toast-inner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px 8px 16px 14px;
+}
+.toast-icon {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.toast-icon svg {
+  width: 18px;
+  height: 18px;
+}
+.toast--success .toast-icon {
+  background: var(--color-success);
+  color: #fff;
+}
+.toast--error .toast-icon {
+  background: var(--color-danger);
+  color: #fff;
+}
+.toast--warning .toast-icon {
+  background: var(--color-gold);
+  color: var(--color-navy);
+}
+.toast--info .toast-icon {
+  background: var(--color-navy);
+  color: var(--color-gold);
+}
+.toast-text {
+  flex-grow: 1;
+  min-width: 0;
+  padding-top: 1px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.toast-title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.toast-msg {
+  font-size: 0.875rem;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+.toast-action {
+  align-self: flex-start;
+  margin-top: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-line-strong);
+  background: var(--color-surface);
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  cursor: pointer;
+}
+.toast-close {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--color-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.toast-close svg {
+  width: 16px;
+  height: 16px;
+}
+.toast-progress {
+  height: 3px;
+  background: color-mix(in srgb, var(--color-navy) 6%, transparent);
+}
+.toast-progress span {
+  display: block;
+  height: 100%;
+  width: 100%;
+  transform-origin: left;
+  animation: toast-timer linear forwards;
+}
+.toast--success .toast-progress span {
+  background: var(--color-success);
+}
+.toast--warning .toast-progress span {
+  background: var(--color-gold);
+}
+.toast--info .toast-progress span {
+  background: var(--color-navy);
+}
+.toast:hover .toast-progress span {
+  animation-play-state: paused;
+}
+@keyframes toast-timer {
+  to {
+    transform: scaleX(0);
+  }
+}
+
+@media (max-width: 1023px) {
+  .toast-stack {
+    top: calc(64px + 8px + env(safe-area-inset-top, 0px));
+    left: 10px;
+    right: 10px;
+    width: auto;
+    gap: 8px;
+  }
+  .toast {
+    border-radius: 12px;
+    box-shadow: 0 8px 20px rgba(18, 32, 61, 0.14);
+  }
+  .toast-inner {
+    gap: 10px;
+    padding: 10px 4px 11px 12px;
+  }
+  .toast-icon {
+    width: 28px;
+    height: 28px;
+  }
+  .toast-icon svg {
+    width: 14px;
+    height: 14px;
+  }
+  .toast-text {
+    gap: 1px;
+    padding-top: 3px;
+  }
+  .toast-title {
+    font-size: 0.875rem;
+  }
+  .toast-msg {
+    font-size: 0.8125rem;
+    line-height: 1.4;
+  }
+  .toast-action {
+    margin-top: 5px;
+    height: 30px;
+    padding: 0 10px;
+    font-size: 0.75rem;
+  }
+  .toast-close {
+    width: 32px;
+    height: 32px;
+  }
+  .toast-close svg {
+    width: 14px;
+    height: 14px;
+  }
+  .toast-progress {
+    height: 2px;
+  }
+}

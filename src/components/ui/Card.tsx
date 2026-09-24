@@ -1,17 +1,16 @@
-import { type ReactNode } from "react";
+import { type ComponentPropsWithoutRef } from "react";
 
-interface CardProps {
-  children: ReactNode;
-  className?: string;
-}
+type CardProps = ComponentPropsWithoutRef<"section">;
 
 const CARD_CLASSES =
   "bg-[var(--color-surface)] border border-[var(--color-border)] rounded-md " +
   "p-6 shadow-[var(--shadow-card)]";
 
-function Card({ children, className }: CardProps) {
+function Card({ children, className, ...rest }: CardProps) {
   return (
-    <section className={[CARD_CLASSES, className].filter(Boolean).join(" ")}>{children}</section>
+    <section className={[CARD_CLASSES, className].filter(Boolean).join(" ")} {...rest}>
+      {children}
+    </section>
   );
 }
 

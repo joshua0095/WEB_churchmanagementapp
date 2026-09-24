@@ -53,3 +53,12 @@ export function clearToken(): void {
 export function isAuthenticated(): boolean {
   return getToken() !== null;
 }
+
+/** Same precedence as the badge shown on the My Profile page (Admin > Registrar > Member),
+ * but derived from the login-time flags cached here rather than a fresh User fetch — for
+ * places like the sidebar user card that only need a role label, not the full profile. */
+export function getRoleLabel(): string {
+  if (isAdmin()) return "Admin";
+  if (isRegistrar()) return "Registrar";
+  return "Member";
+}

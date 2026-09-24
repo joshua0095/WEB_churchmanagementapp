@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MoreIcon } from "./icons";
 
@@ -12,6 +12,10 @@ export interface DropdownMenuItem {
 interface DropdownMenuProps {
   items: DropdownMenuItem[];
   ariaLabel: string;
+  /** Overrides the default circular three-dot trigger — e.g. the Settings page's square
+   * kebab button — while every other call site keeps that default unchanged. */
+  icon?: ReactNode;
+  triggerClassName?: string;
 }
 
 const MENU_WIDTH = 190;
@@ -25,7 +29,7 @@ const MENU_WIDTH = 190;
  * but visible forces the computed overflow-y to auto too, so a short container (as short
  * as a single table row) cuts the menu off instead of letting it float over the page.
  */
-function DropdownMenu({ items, ariaLabel }: DropdownMenuProps) {
+function DropdownMenu({ items, ariaLabel, icon, triggerClassName }: DropdownMenuProps) {
   const [open, setOpen] = useState(false);
   const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
   const buttonRef = useRef<HTMLButtonElement>(null);
@@ -69,9 +73,12 @@ function DropdownMenu({ items, ariaLabel }: DropdownMenuProps) {
           e.stopPropagation();
           setOpen((v) => !v);
         }}
-        className="flex h-8 w-8 items-center justify-center rounded-full border-0 bg-transparent text-[var(--color-text-secondary)] transition-colors hover:bg-black/5 hover:text-[var(--color-text-primary)]"
+        className={
+          triggerClassName ??
+          "flex h-8 w-8 items-center justify-center rounded-full border-0 bg-transparent text-[var(--color-text-secondary)] transition-colors hover:bg-black/5 hover:text-[var(--color-text-primary)]"
+        }
       >
-        <MoreIcon />
+        {icon ?? <MoreIcon />}
       </button>
       {open &&
         position &&

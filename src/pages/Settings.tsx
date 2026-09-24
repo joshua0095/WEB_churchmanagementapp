@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   addLifeGroupMember,
   createLifeGroup,
@@ -42,33 +43,43 @@ import {
   AppShell,
   Button,
   Card,
+  CheckTile,
   DropdownMenu,
   Modal,
-  Skeleton,
+  SegmentedControl,
   SelectField,
-  Tabs,
+  Skeleton,
+  Switch,
   TextField,
+  TreeList,
 } from "../components/ui";
 import { ChevronDownIcon, TrashIcon } from "../components/ui/icons";
-import {
-  buildNetworkTree,
-  flattenNetworksForSelect,
-  SINGLE_SELECT_PARENT_NAME,
-  type NetworkTreeNode,
-} from "../components/networkTree";
+import { InfoIcon, KebabIcon, TopbarSearchIcon } from "../components/ui/shellIcons";
+import { buildNetworkTree, flattenNetworksForSelect, SINGLE_SELECT_PARENT_NAME } from "../components/networkTree";
 import { getBibleVersionId, setBibleVersionId, type BibleModule } from "../preferences";
 import { confirmDialog, infoAlert, successToast } from "../swal";
 
 const emptyLifeGroupForm = { groupName: "", leaderId: "", networkId: "", category: "Church" as LifeGroupCategory };
 
 type SettingsTab = "general" | "attendance" | "lifegroups" | "networks" | "access";
-const SETTINGS_TABS: { key: SettingsTab; label: string }[] = [
-  { key: "general", label: "General" },
-  { key: "attendance", label: "Attendance" },
-  { key: "lifegroups", label: "Life Groups" },
-  { key: "networks", label: "Networks" },
-  { key: "access", label: "Access" },
+const SETTINGS_TABS: { key: SettingsTab; label: string; desc: string }[] = [
+  { key: "general", label: "General", desc: "Bible versions" },
+  { key: "attendance", label: "Attendance", desc: "Events & rosters" },
+  { key: "lifegroups", label: "Life Groups", desc: "Groups & leaders" },
+  { key: "networks", label: "Networks", desc: "Networks & ministries" },
+  { key: "access", label: "Access", desc: "Module permissions" },
 ];
+
+// Sourced from the real RosterScope union (a Record here means TS errors if that type ever
+// gains/drops a member without this being updated) rather than a hardcoded options list.
+const ROSTER_LABELS: Record<RosterScope, string> = {
+  Both: "Both",
+  Workers: "Workers",
+  Congregation: "Congregation",
+};
+const ROSTER_OPTIONS: { value: RosterScope; label: string }[] = (Object.keys(ROSTER_LABELS) as RosterScope[]).map(
+  (value) => ({ value, label: ROSTER_LABELS[value] }),
+);
 
 interface LeaderPickerProps {
   users: User[];
@@ -198,19 +209,26 @@ function categorizeForLifeGroup(member: CongregationMember, asOf: Date): string 
   return null;
 }
 
+/** Short display code for a life group, e.g. id 3 → "LG03" — a client-side derivation for the
+ * row's badge, not a value the backend stores. */
+function lifeGroupCode(id: number): string {
+  return `LG${String(id).padStart(2, "0")}`;
+}
+
 interface LifeGroupRowProps {
   group: LifeGroupSummary;
   congregation: CongregationMember[];
   onEdit: (group: LifeGroupSummary) => void;
-  /** Refreshes the parent's group list — needed so the collapsed row's member count updates
+  /** Refreshes the parent's group list — needed so the row's member count updates
    * immediately after adding someone, instead of only after a reload. */
   onMemberAdded: () => void;
 }
 
-/** Expandable row: collapsed shows leader/network/type/count at a glance; expanded lazily
- * loads and lists members, with a quick way to add one — either an existing Congregation
- * member (picked by name) or someone brand new who isn't in the system yet — the same
- * roster data Attendance uses when taking roll for this group. */
+/** Table-style row: collapsed shows code/leader/type/network/count at a glance; clicking it
+ * (anywhere but the kebab) lazily loads and expands into the member list, with a quick way to
+ * add one — either an existing Congregation member (picked by name) or someone brand new who
+ * isn't in the system yet — the same roster data Attendance uses when taking roll for this
+ * group. */
 function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupRowProps) {
   const [expanded, setExpanded] = useState(false);
   const [members, setMembers] = useState<LifeGroupMember[] | null>(null);
@@ -296,36 +314,40 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
   };
 
   return (
-    <div className="rounded-md border border-[var(--color-border)]">
-      <div className="flex items-center justify-between gap-3 px-3 py-2">
-        <button
-          type="button"
-          onClick={toggleExpand}
-          className="flex flex-1 cursor-pointer items-center gap-3 border-0 bg-transparent p-0 text-left"
-        >
-          <ChevronDownIcon
-            className={[
-              "h-4 w-4 shrink-0 text-[var(--color-text-secondary)] transition-transform",
-              expanded ? "rotate-180" : "",
-            ].join(" ")}
-          />
-          <div>
-            <p className="font-semibold text-[var(--color-text-primary)]">{group.groupName}</p>
-            <p className="text-sm text-[var(--color-text-secondary)]">
-              {group.category === "Community" ? "Community" : "Church"} Life Group · Led by {group.leaderName}
-              {group.networkName && ` · ${group.networkName}`} · {group.memberCount} member
-              {group.memberCount === 1 ? "" : "s"}
-            </p>
-          </div>
-        </button>
+    <div>
+      <div
+        className="settings-trow settings-cols-lifegroups cursor-pointer"
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        onClick={toggleExpand}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            toggleExpand();
+          }
+        }}
+      >
+        <span className="settings-code">{lifeGroupCode(group.id)}</span>
+        <span>
+          <span className="settings-group-name block">{group.groupName}</span>
+          <span className="settings-group-leader block">Led by {group.leaderName}</span>
+        </span>
+        <span className={["settings-chip", group.category === "Community" ? "settings-chip--community" : "settings-chip--church"].join(" ")}>
+          {group.category}
+        </span>
+        <span className="settings-network-cell">{group.networkName ?? "—"}</span>
+        <span className="settings-members">{group.memberCount}</span>
         <DropdownMenu
+          icon={<KebabIcon />}
+          triggerClassName="settings-kebab"
           ariaLabel={`Actions for ${group.groupName}`}
           items={[{ label: "Edit", onSelect: () => onEdit(group) }]}
         />
       </div>
 
       {expanded && (
-        <div className="border-t border-[var(--color-border)] px-3 py-3">
+        <div className="border-t border-[var(--color-line)] px-7 py-4">
           {membersError && <p className="error mb-2">{membersError}</p>}
           {loadingMembers ? (
             <Skeleton className="h-8 w-full" />
@@ -337,7 +359,10 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
                     <p className="text-sm text-[var(--color-text-secondary)]">{m.name}</p>
                     <button
                       type="button"
-                      onClick={() => handleRemoveMember(m)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleRemoveMember(m);
+                      }}
                       aria-label={`Remove ${m.name}`}
                       title="Remove member"
                       className="flex shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent p-1 text-[var(--color-text-secondary)] hover:text-[var(--color-danger)]"
@@ -349,7 +374,7 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
               ) : (
                 <p className="helper-text">No members yet.</p>
               )}
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end" onClick={(e) => e.stopPropagation()}>
                 <div className="relative flex-1">
                   <TextField
                     label="Add member"
@@ -382,15 +407,14 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
                     </div>
                   )}
                 </div>
-                <Button
-                  type="button"
-                  onClick={handleAddMember}
-                  disabled={addingMember || !newMemberName.trim()}
-                >
+                <Button type="button" onClick={handleAddMember} disabled={addingMember || !newMemberName.trim()}>
                   {addingMember ? "Adding..." : "Add"}
                 </Button>
               </div>
-              <label className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
+              <label
+                className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <input
                   type="checkbox"
                   checked={newMemberIsFirstTimer}
@@ -400,8 +424,8 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
               </label>
               {categoryFilter && (
                 <p className="helper-text">
-                  Showing congregation members classified as "{categoryFilter}" for{" "}
-                  {group.networkName} — type a name not listed to add someone new.
+                  Showing congregation members classified as "{categoryFilter}" for {group.networkName} — type a
+                  name not listed to add someone new.
                 </p>
               )}
             </div>
@@ -412,81 +436,26 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
   );
 }
 
-const BIBLE_MODULES: { key: BibleModule; label: string }[] = [
-  { key: "verseOfTheDay", label: "Verse of the Day" },
-  { key: "devotion", label: "Devotion" },
+const BIBLE_MODULES: { key: BibleModule; label: string; hint: string }[] = [
+  { key: "verseOfTheDay", label: "Verse of the Day", hint: "Shown on everyone's Home screen." },
+  { key: "devotion", label: "Devotion", hint: "Used when members look up a verse in their SOAP devotion." },
 ];
 
 const emptyNetworkForm = { name: "", parentNetworkId: "" };
 const emptyMinistryForm = { name: "", networkId: "" };
 
-interface ManageNetworkNodeProps {
-  node: NetworkTreeNode;
-  depth: number;
-  onEditNetwork: (network: Network) => void;
-  onDeleteNetwork: (network: Network) => void;
-  onEditMinistry: (ministry: Ministry) => void;
-  onDeleteMinistry: (ministry: Ministry) => void;
-}
-
-function ManageNetworkNode({
-  node,
-  depth,
-  onEditNetwork,
-  onDeleteNetwork,
-  onEditMinistry,
-  onDeleteMinistry,
-}: ManageNetworkNodeProps) {
-  return (
-    <div className={depth > 0 ? "ml-6 mt-2" : ""}>
-      <div className="flex items-center justify-between gap-3 rounded-md border border-[var(--color-border)] px-3 py-2">
-        <p className="font-semibold text-[var(--color-text-primary)]">{node.network.name}</p>
-        <DropdownMenu
-          ariaLabel={`Actions for ${node.network.name}`}
-          items={[
-            { label: "Edit", onSelect: () => onEditNetwork(node.network) },
-            { label: "Delete", onSelect: () => onDeleteNetwork(node.network), danger: true, dividerBefore: true },
-          ]}
-        />
-      </div>
-
-      {node.ministries.length > 0 && (
-        <div className="ml-6 mt-2 flex flex-col gap-2">
-          {node.ministries.map((m) => (
-            <div
-              key={m.id}
-              className="flex items-center justify-between gap-3 rounded-md border border-dashed border-[var(--color-border)] px-3 py-2"
-            >
-              <p className="text-sm text-[var(--color-text-secondary)]">{m.name}</p>
-              <DropdownMenu
-                ariaLabel={`Actions for ${m.name}`}
-                items={[
-                  { label: "Edit", onSelect: () => onEditMinistry(m) },
-                  { label: "Delete", onSelect: () => onDeleteMinistry(m), danger: true, dividerBefore: true },
-                ]}
-              />
-            </div>
-          ))}
-        </div>
-      )}
-
-      {node.children.map((child) => (
-        <ManageNetworkNode
-          key={child.network.id}
-          node={child}
-          depth={depth + 1}
-          onEditNetwork={onEditNetwork}
-          onDeleteNetwork={onDeleteNetwork}
-          onEditMinistry={onEditMinistry}
-          onDeleteMinistry={onDeleteMinistry}
-        />
-      ))}
-    </div>
-  );
-}
-
 function Settings() {
-  const [activeTab, setActiveTab] = useState<SettingsTab>("general");
+  const navigate = useNavigate();
+  const { tab } = useParams<{ tab?: string }>();
+  const canManageAccess = isAdmin();
+  const activeTab: SettingsTab =
+    canManageAccess && SETTINGS_TABS.some((t) => t.key === tab) ? (tab as SettingsTab) : "general";
+
+  // Keeps the URL canonical — redirects a bogus/disallowed tab segment (or a non-admin
+  // landing on an admin-only one) back to whichever tab is actually showing.
+  useEffect(() => {
+    if (tab !== activeTab) navigate(`/settings/${activeTab}`, { replace: true });
+  }, [tab, activeTab, navigate]);
 
   const [versions, setVersions] = useState<BibleVersion[]>([]);
   const [selected, setSelected] = useState<Record<BibleModule, string>>({
@@ -496,7 +465,6 @@ function Settings() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const canManageAccess = isAdmin();
   const [networks, setNetworks] = useState<Network[]>([]);
   const [ministries, setMinistries] = useState<Ministry[]>([]);
   const [accessRows, setAccessRows] = useState<ModuleAccessRow[]>([]);
@@ -545,6 +513,8 @@ function Settings() {
   const [lifeGroups, setLifeGroups] = useState<LifeGroupSummary[]>([]);
   const [loadingLifeGroups, setLoadingLifeGroups] = useState(canManageAccess);
   const [lifeGroupsError, setLifeGroupsError] = useState<string | null>(null);
+  const [lgSearch, setLgSearch] = useState("");
+  const [lgFilter, setLgFilter] = useState<"All" | LifeGroupCategory>("All");
   const [users, setUsers] = useState<User[]>([]);
   const [congregation, setCongregation] = useState<CongregationMember[]>([]);
 
@@ -553,6 +523,15 @@ function Settings() {
   const [lifeGroupForm, setLifeGroupForm] = useState(emptyLifeGroupForm);
   const [savingLifeGroup, setSavingLifeGroup] = useState(false);
   const [lifeGroupFormError, setLifeGroupFormError] = useState<string | null>(null);
+
+  const visibleLifeGroups = useMemo(() => {
+    const q = lgSearch.trim().toLowerCase();
+    return lifeGroups.filter(
+      (g) =>
+        (lgFilter === "All" || g.category === lgFilter) &&
+        (!q || g.groupName.toLowerCase().includes(q) || g.leaderName.toLowerCase().includes(q)),
+    );
+  }, [lifeGroups, lgFilter, lgSearch]);
 
   useEffect(() => {
     getBibleVersions()
@@ -657,8 +636,7 @@ function Settings() {
   };
 
   const selectedLeaderId = lifeGroupForm.leaderId ? Number(lifeGroupForm.leaderId) : null;
-  const leaderMissingLgnNetwork =
-    selectedLeaderId !== null && getLeaderLgnNetworkId(selectedLeaderId) === null;
+  const leaderMissingLgnNetwork = selectedLeaderId !== null && getLeaderLgnNetworkId(selectedLeaderId) === null;
 
   const handleSaveLifeGroup = async () => {
     if (!lifeGroupForm.groupName.trim() || !lifeGroupForm.leaderId) return;
@@ -859,248 +837,304 @@ function Settings() {
 
   return (
     <AppShell>
-      <div className="page-header">
-        <h1>Settings</h1>
-      </div>
-
-      {canManageAccess && (
-        <Tabs items={SETTINGS_TABS} activeKey={activeTab} onChange={setActiveTab} className="mb-6" />
-      )}
-
-      {(!canManageAccess || activeTab === "general") && (
-        <Card>
-          <h2 className="section-title">Bible Version</h2>
-          <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
-            Choose a translation for each module — they can be set independently.
+      <div className="flex flex-col gap-6">
+        <div>
+          <h1 className="m-0 font-display text-[2.1rem] font-semibold text-[var(--color-text-primary)]">Settings</h1>
+          <p className="m-0 mt-1.5 text-[0.9375rem] text-[var(--color-text-secondary)]">
+            Church-wide setup. Changes here apply to everyone using the app.
           </p>
-          {loading && (
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-2">
-                <Skeleton className="h-3 w-32" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-              <div className="flex flex-col gap-2">
-                <Skeleton className="h-3 w-32" />
-                <Skeleton className="h-10 w-full" />
-              </div>
-            </div>
-          )}
-          {error && <p className="error">{error}</p>}
-          {!loading && !error && (
-            <div className="flex flex-col gap-4">
-              {BIBLE_MODULES.map((mod) => (
-                <SelectField
-                  key={mod.key}
-                  label={mod.label}
-                  value={selected[mod.key]}
-                  onChange={(e) => handleChange(mod.key, e.target.value)}
+        </div>
+
+        <div className={canManageAccess ? "settings-layout" : ""}>
+          {canManageAccess && (
+            <div className="settings-nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
+              {SETTINGS_TABS.map((t) => (
+                <button
+                  key={t.key}
+                  type="button"
+                  role="tab"
+                  id={`tab-${t.key}`}
+                  aria-controls={`panel-${t.key}`}
+                  aria-selected={activeTab === t.key}
+                  className="settings-tab"
+                  onClick={() => navigate(`/settings/${t.key}`)}
                 >
-                  {versions.map((v) => (
-                    <option key={v.id} value={v.id}>
-                      {v.title} ({v.abbreviation})
-                    </option>
-                  ))}
-                </SelectField>
+                  <span className="app-nav-ribbon" aria-hidden="true" />
+                  <span className="settings-tab-label">{t.label}</span>
+                  <span className="settings-tab-desc">{t.desc}</span>
+                </button>
               ))}
             </div>
           )}
-        </Card>
-      )}
 
-      {canManageAccess && activeTab === "attendance" && (
-        <Card>
-          <h2 className="section-title">Attendance Events</h2>
-          <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
-            "Roster" controls which named check-in this event accepts — some events (like
-            Worker's Empowerment) only ever take Worker attendance. When "Sunday only" is on,
-            that event's date picker refuses every other day — for a service (like WHS) that
-            only ever happens on a Sunday.
-          </p>
-          {eventsError && <p className="error mb-3">{eventsError}</p>}
-          {loadingEvents ? (
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {events.map((event) => (
-                <div
-                  key={event.id}
-                  className="flex flex-col gap-3 rounded-md border border-[var(--color-border)] px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-                >
-                  <p className="font-semibold text-[var(--color-text-primary)]">{event.name}</p>
-                  <div className="flex flex-wrap items-center gap-4">
-                    <SelectField
-                      label="Roster"
-                      value={event.rosterScope}
-                      disabled={savingEventId === event.id}
-                      onChange={(e) => handleChangeRosterScope(event, e.target.value as RosterScope)}
-                      className="sm:max-w-[160px]"
-                    >
-                      <option value="Both">Workers &amp; Congregation</option>
-                      <option value="Workers">Workers only</option>
-                      <option value="Congregation">Congregation only</option>
-                    </SelectField>
-                    <label className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-secondary)]">
-                      Sunday only
-                      <input
-                        type="checkbox"
+          <div className="flex flex-col gap-6">
+            {activeTab === "general" && (
+              <Card className="!rounded-2xl !p-0" id="panel-general" role="tabpanel" aria-labelledby="tab-general">
+                <div className="card-head border-b border-[var(--color-line)] px-7 pb-5 pt-6">
+                  <div>
+                    <h2 className="m-0 font-display text-xl font-semibold text-[var(--color-text-primary)]">Bible version</h2>
+                    <p className="m-0 mt-1 text-sm text-[var(--color-text-secondary)]">
+                      Pick a translation for each module. They can be set independently.
+                    </p>
+                  </div>
+                </div>
+                {loading && (
+                  <div className="flex flex-col gap-4 p-7">
+                    <Skeleton className="h-12 w-full" />
+                    <Skeleton className="h-12 w-full" />
+                  </div>
+                )}
+                {error && <p className="error px-7 py-4">{error}</p>}
+                {!loading &&
+                  !error &&
+                  BIBLE_MODULES.map((mod) => (
+                    <div key={mod.key} className="setting-row">
+                      <div className="setting-row-text">
+                        <label className="setting-row-label" htmlFor={mod.key}>
+                          {mod.label}
+                        </label>
+                        <span className="setting-row-hint">{mod.hint}</span>
+                      </div>
+                      <select
+                        id={mod.key}
+                        className="settings-select"
+                        value={selected[mod.key]}
+                        onChange={(e) => handleChange(mod.key, e.target.value)}
+                      >
+                        {versions.map((v) => (
+                          <option key={v.id} value={v.id}>
+                            {v.title} ({v.abbreviation})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ))}
+              </Card>
+            )}
+
+            {canManageAccess && activeTab === "attendance" && (
+              <Card className="!rounded-2xl !p-0" id="panel-attendance" role="tabpanel" aria-labelledby="tab-attendance">
+                <div className="card-head px-7 pb-5 pt-6">
+                  <div>
+                    <h2 className="m-0 font-display text-xl font-semibold text-[var(--color-text-primary)]">Attendance events</h2>
+                    <p className="m-0 mt-1 text-sm text-[var(--color-text-secondary)]">
+                      Set who can be checked in for each event, and whether it only happens on Sundays.
+                    </p>
+                  </div>
+                </div>
+                <div className="settings-thead settings-cols-attendance">
+                  <span>Event</span>
+                  <span>Roster</span>
+                  <span className="settings-cell-center">Sunday only</span>
+                </div>
+                {eventsError && <p className="error px-7 py-3">{eventsError}</p>}
+                {loadingEvents ? (
+                  <div className="flex flex-col gap-2 p-7">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                ) : (
+                  events.map((event) => (
+                    <div key={event.id} className="settings-trow settings-cols-attendance settings-att-row">
+                      <span className="settings-event-name">{event.name}</span>
+                      <SegmentedControl
+                        aria-label={`Roster for ${event.name}`}
+                        options={ROSTER_OPTIONS}
+                        value={event.rosterScope}
+                        disabled={savingEventId === event.id}
+                        onChange={(value) => handleChangeRosterScope(event, value)}
+                      />
+                      <Switch
+                        className="settings-cell-center"
                         checked={event.sundayOnly}
                         disabled={savingEventId === event.id}
                         onChange={() => handleToggleSundayOnly(event)}
-                        aria-label={`${event.name} is Sunday-only`}
+                        aria-label={`Sunday only for ${event.name}`}
                       />
-                    </label>
+                    </div>
+                  ))
+                )}
+                <div className="settings-legend">
+                  <span>
+                    <strong>Roster:</strong> which check-in list the event accepts.
+                  </span>
+                  <span>
+                    <strong>Sunday only:</strong> the date picker allows Sundays only.
+                  </span>
+                </div>
+              </Card>
+            )}
+
+            {canManageAccess && activeTab === "lifegroups" && (
+              <Card className="!rounded-2xl !p-0" id="panel-lifegroups" role="tabpanel" aria-labelledby="tab-lifegroups">
+                <div className="card-head px-7 pb-5 pt-6">
+                  <div>
+                    <h2 className="m-0 font-display text-xl font-semibold text-[var(--color-text-primary)]">
+                      Life Groups <span className="font-sans text-sm font-medium text-[var(--color-text-secondary)]">· {lifeGroups.length} groups</span>
+                    </h2>
+                    <p className="m-0 mt-1 text-sm text-[var(--color-text-secondary)]">
+                      Leaders, networks and group type. This is what shows up when taking roll for a group.
+                    </p>
+                  </div>
+                  <Button type="button" onClick={openAddLifeGroup} className="shrink-0">
+                    + Add Life Group
+                  </Button>
+                </div>
+                <div className="settings-toolbar">
+                  <label className="app-search">
+                    <TopbarSearchIcon />
+                    <input
+                      type="search"
+                      placeholder="Search by group or leader"
+                      aria-label="Search life groups"
+                      value={lgSearch}
+                      onChange={(e) => setLgSearch(e.target.value)}
+                    />
+                  </label>
+                  <SegmentedControl
+                    aria-label="Filter by type"
+                    variant="dark"
+                    inline
+                    options={[
+                      { value: "All", label: "All" },
+                      { value: "Church", label: "Church" },
+                      { value: "Community", label: "Community" },
+                    ]}
+                    value={lgFilter}
+                    onChange={setLgFilter}
+                  />
+                </div>
+                <div className="settings-thead settings-cols-lifegroups">
+                  <span>Group</span>
+                  <span>Leader</span>
+                  <span>Type</span>
+                  <span>Network</span>
+                  <span className="settings-cell-right">Members</span>
+                  <span />
+                </div>
+                {lifeGroupsError && <p className="error px-7 py-3">{lifeGroupsError}</p>}
+                {loadingLifeGroups ? (
+                  <div className="flex flex-col gap-2 p-7">
+                    <Skeleton className="h-14 w-full rounded-md" />
+                    <Skeleton className="h-14 w-full rounded-md" />
+                  </div>
+                ) : visibleLifeGroups.length === 0 ? (
+                  <p className="px-7 py-6 text-sm text-[var(--color-text-secondary)]">
+                    {lifeGroups.length === 0
+                      ? "No life groups yet. Add one to get started."
+                      : "No groups match. Try a different name or filter."}
+                  </p>
+                ) : (
+                  visibleLifeGroups.map((group) => (
+                    <LifeGroupRow
+                      key={group.id}
+                      group={group}
+                      congregation={congregation}
+                      onEdit={openEditLifeGroup}
+                      onMemberAdded={() => loadLifeGroups(true)}
+                    />
+                  ))
+                )}
+                <div className="h-3" />
+              </Card>
+            )}
+
+            {canManageAccess && activeTab === "networks" && (
+              <Card className="!rounded-2xl !p-0 pb-3" id="panel-networks" role="tabpanel" aria-labelledby="tab-networks">
+                <div className="card-head px-7 pb-5 pt-6">
+                  <div>
+                    <h2 className="m-0 font-display text-xl font-semibold text-[var(--color-text-primary)]">Networks &amp; ministries</h2>
+                    <p className="m-0 mt-1 text-sm text-[var(--color-text-secondary)]">
+                      Each network holds its ministries. Members are assigned to these on their profile.
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    <Button type="button" variant="outline" onClick={openAddMinistry}>
+                      + Add ministry
+                    </Button>
+                    <Button type="button" onClick={openAddNetwork}>
+                      + Add network
+                    </Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </Card>
-      )}
+                {accessError && <p className="error px-7 py-3">{accessError}</p>}
+                {loadingAccess ? (
+                  <div className="flex flex-col gap-2 px-7 pb-4">
+                    <Skeleton className="h-14 w-full rounded-md" />
+                    <Skeleton className="h-14 w-full rounded-md" />
+                  </div>
+                ) : (
+                  <TreeList
+                    tree={networkTree}
+                    onEditNetwork={openEditNetwork}
+                    onDeleteNetwork={handleDeleteNetwork}
+                    onEditMinistry={openEditMinistry}
+                    onDeleteMinistry={handleDeleteMinistry}
+                  />
+                )}
+              </Card>
+            )}
 
-      {canManageAccess && activeTab === "lifegroups" && (
-        <Card>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="section-title !mb-0">Life Groups</h2>
-            <Button type="button" onClick={openAddLifeGroup}>
-              + Add Life Group
-            </Button>
-          </div>
-          <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
-            Leader, network, and whether it's a church or community Life Group — this is the
-            data that shows up on the Attendance side when taking roll for a group.
-          </p>
-          {lifeGroupsError && <p className="error mb-3">{lifeGroupsError}</p>}
-          {loadingLifeGroups ? (
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-14 w-full rounded-md" />
-              <Skeleton className="h-14 w-full rounded-md" />
-            </div>
-          ) : lifeGroups.length === 0 ? (
-            <p className="helper-text">No life groups yet. Add one to get started.</p>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {lifeGroups.map((group) => (
-                <LifeGroupRow
-                  key={group.id}
-                  group={group}
-                  congregation={congregation}
-                  onEdit={openEditLifeGroup}
-                  onMemberAdded={() => loadLifeGroups(true)}
-                />
-              ))}
-            </div>
-          )}
-        </Card>
-      )}
-
-      {canManageAccess && activeTab === "networks" && (
-        <Card>
-          <div className="mb-4 flex items-center justify-between gap-3">
-            <h2 className="section-title !mb-0">Networks &amp; Ministries</h2>
-            <div className="flex gap-2">
-              <Button type="button" variant="secondary" onClick={openAddNetwork}>
-                + Add network
-              </Button>
-              <Button type="button" onClick={openAddMinistry}>
-                + Add ministry
-              </Button>
-            </div>
-          </div>
-          {accessError && <p className="error mb-3">{accessError}</p>}
-          {loadingAccess ? (
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-14 w-full rounded-md" />
-              <Skeleton className="h-14 w-full rounded-md" />
-            </div>
-          ) : networkTree.length === 0 ? (
-            <p className="helper-text">No networks yet.</p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {networkTree.map((root) => (
-                <ManageNetworkNode
-                  key={root.network.id}
-                  node={root}
-                  depth={0}
-                  onEditNetwork={openEditNetwork}
-                  onDeleteNetwork={handleDeleteNetwork}
-                  onEditMinistry={openEditMinistry}
-                  onDeleteMinistry={handleDeleteMinistry}
-                />
-              ))}
-            </div>
-          )}
-        </Card>
-      )}
-
-      {canManageAccess && activeTab === "access" && (
-        <Card>
-          <h2 className="section-title">Module Access by Network</h2>
-          <p className="mb-4 text-sm text-[var(--color-text-secondary)]">
-            Control which modules each network can use. Admins always have full access. A network with no
-            explicit rule below defaults to allowed.
-          </p>
-          {loadingAccess && (
-            <div className="flex flex-col gap-2">
-              <Skeleton className="h-10 w-full" />
-              <Skeleton className="h-10 w-full" />
-            </div>
-          )}
-          {accessError && <p className="error mb-3">{accessError}</p>}
-          {!loadingAccess && networks.length === 0 && (
-            <p className="helper-text">No networks yet — add one above first.</p>
-          )}
-          {!loadingAccess && networks.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[560px] border-collapse text-sm">
-                <thead>
-                  <tr>
-                    <th className="border-b border-[var(--color-border)] px-3 py-2 text-left font-bold text-[var(--color-text-secondary)]">
-                      Network
-                    </th>
-                    {ACCESS_MODULES.map((mod) => (
-                      <th
-                        key={mod}
-                        className="border-b border-[var(--color-border)] px-3 py-2 text-center font-bold text-[var(--color-text-secondary)]"
-                      >
-                        {mod}
-                      </th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {flattenNetworksForSelect(networkTree).map(({ id, name, depth }) => (
-                    <tr key={id}>
-                      <td className="border-b border-[var(--color-border)] px-3 py-2">
-                        <p className="font-semibold text-[var(--color-text-primary)]" style={{ paddingLeft: depth * 16 }}>
-                          {depth > 0 && "– "}
-                          {name}
-                        </p>
-                      </td>
+            {canManageAccess && activeTab === "access" && (
+              <Card className="!rounded-2xl !p-0 pb-2" id="panel-access" role="tabpanel" aria-labelledby="tab-access">
+                <div className="card-head px-7 pb-4 pt-6">
+                  <div>
+                    <h2 className="m-0 font-display text-xl font-semibold text-[var(--color-text-primary)]">Module access</h2>
+                    <p className="m-0 mt-1 text-sm text-[var(--color-text-secondary)]">
+                      Choose which modules each network can open.
+                    </p>
+                  </div>
+                </div>
+                <div className="settings-callout">
+                  <InfoIcon className="h-[18px] w-[18px]" />
+                  <span>Admins always have full access. A network without a rule is allowed by default.</span>
+                </div>
+                <div className="settings-thead settings-cols-access">
+                  <span>Network</span>
+                  {ACCESS_MODULES.map((mod) => (
+                    <span key={mod} className="settings-cell-center">
+                      {mod}
+                    </span>
+                  ))}
+                </div>
+                {accessError && <p className="error px-7 py-3">{accessError}</p>}
+                {loadingAccess && (
+                  <div className="flex flex-col gap-2 px-7 py-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                )}
+                {!loadingAccess && networks.length === 0 && (
+                  <p className="px-7 py-6 text-sm text-[var(--color-text-secondary)]">No networks yet — add one above first.</p>
+                )}
+                {!loadingAccess &&
+                  flattenNetworksForSelect(networkTree).map(({ id, name, depth }) => (
+                    <div
+                      key={id}
+                      className={["settings-trow settings-cols-access settings-acc-row", depth === 0 ? "settings-acc-row--parent" : "settings-acc-row--child"].join(
+                        " ",
+                      )}
+                    >
+                      <span className="settings-acc-name">{name}</span>
                       {ACCESS_MODULES.map((mod) => {
                         const cellKey = `${id}-${mod}`;
                         return (
-                          <td key={mod} className="border-b border-[var(--color-border)] px-3 py-2 text-center">
-                            <input
-                              type="checkbox"
-                              checked={isAllowed(id, mod)}
-                              disabled={savingCell === cellKey}
-                              onChange={() => handleToggleAccess(id, mod)}
-                              aria-label={`${name} access to ${mod}`}
-                            />
-                          </td>
+                          <CheckTile
+                            key={mod}
+                            checked={isAllowed(id, mod)}
+                            disabled={savingCell === cellKey}
+                            onChange={() => handleToggleAccess(id, mod)}
+                            aria-label={`${mod} access for ${name}`}
+                          />
                         );
                       })}
-                    </tr>
+                    </div>
                   ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </Card>
-      )}
+              </Card>
+            )}
+          </div>
+        </div>
+      </div>
 
       <Modal
         open={networkModalOpen}
@@ -1200,12 +1234,7 @@ function Settings() {
             <Button
               type="button"
               onClick={handleSaveLifeGroup}
-              disabled={
-                savingLifeGroup ||
-                !lifeGroupForm.groupName.trim() ||
-                !lifeGroupForm.leaderId ||
-                leaderMissingLgnNetwork
-              }
+              disabled={savingLifeGroup || !lifeGroupForm.groupName.trim() || !lifeGroupForm.leaderId || leaderMissingLgnNetwork}
             >
               {savingLifeGroup ? "Saving..." : editingLifeGroupId === null ? "Add" : "Save changes"}
             </Button>
@@ -1228,8 +1257,8 @@ function Settings() {
           />
           {leaderMissingLgnNetwork && (
             <p className="error">
-              This leader isn't assigned to a Life Group Network (LGN) sub-network yet — assign
-              one for them under People → Workers first.
+              This leader isn't assigned to a Life Group Network (LGN) sub-network yet — assign one for them under
+              People → Workers first.
             </p>
           )}
           <SelectField
@@ -1247,9 +1276,7 @@ function Settings() {
           <SelectField
             label="Type"
             value={lifeGroupForm.category}
-            onChange={(e) =>
-              setLifeGroupForm((f) => ({ ...f, category: e.target.value as LifeGroupCategory }))
-            }
+            onChange={(e) => setLifeGroupForm((f) => ({ ...f, category: e.target.value as LifeGroupCategory }))}
           >
             <option value="Church">Church Life Group</option>
             <option value="Community">Community Life Group</option>

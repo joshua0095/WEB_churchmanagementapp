@@ -40,6 +40,18 @@ export function getAncestorNetworkIds(networkId: number, networks: Network[]): n
   return ancestors;
 }
 
+/** Short display code for a network name, e.g. "Church Development Network" → "CDN" — a
+ * client-side derivation for tile/badge display, not a value the backend stores. */
+export function abbreviateNetworkName(name: string): string {
+  const words = name.split(/\s+/).filter(Boolean);
+  if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
+  return words
+    .map((w) => w[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 4);
+}
+
 /** Flattens a tree into select-option order (parent immediately before its children), with a depth for indentation. */
 export function flattenNetworksForSelect(tree: NetworkTreeNode[]): { id: number; name: string; depth: number }[] {
   const out: { id: number; name: string; depth: number }[] = [];

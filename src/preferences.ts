@@ -31,3 +31,13 @@ export function getPageSize(table: PaginatedTable, fallback: number): number {
 export function setPageSize(table: PaginatedTable, size: number): void {
   localStorage.setItem(`${PAGE_SIZE_KEY_PREFIX}${table}`, String(size));
 }
+
+const SIDEBAR_COLLAPSED_KEY = "sidebarCollapsed";
+
+export function getSidebarCollapsed(): boolean {
+  return localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "true";
+}
+
+export function setSidebarCollapsed(collapsed: boolean): void {
+  localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
+}

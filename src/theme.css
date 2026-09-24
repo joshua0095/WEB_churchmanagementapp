@@ -2,26 +2,42 @@
 
 :root {
   /* Brand */
-  --color-navy: #0b1c33;
-  --color-navy-mid: #16305a;
-  --color-gold: #f2b705;
-  --color-gold-hover: #d9a604;
+  --color-navy: #12203d;
+  --color-navy-mid: #1a2e52;
+  --color-gold: #d9a32a;
+  --color-gold-hover: #c0901f;
 
   /* Surfaces */
-  --color-bg: #faf6ec;
+  --color-bg: #f7f2e7;
   --color-surface: #ffffff;
   --color-border: #e7e9ec;
+  /* A touch off-white from --color-bg — used for the Settings page's table header
+     rows/zebra strips, where --color-bg itself reads too warm against --color-surface. */
+  --color-bg-soft: #fbf8f1;
+
+  /* Navy-tinted hairlines for the Settings page's dense tables/cards, kept distinct from
+     --color-border (used broadly elsewhere already) rather than changing that shared token. */
+  --color-line: color-mix(in srgb, var(--color-navy) 8%, transparent);
+  --color-line-strong: color-mix(in srgb, var(--color-navy) 16%, transparent);
 
   /* Text */
-  --color-text-primary: #0b1c33;
-  --color-text-secondary: #4a5568;
+  --color-text-primary: #12203d;
+  --color-text-secondary: #5a6480;
   --color-text-on-navy: #ffffff;
-  --color-text-on-gold: #0b1c33;
+  --color-text-on-gold: #12203d;
+
+  /* Muted tones for text/icons on the navy sidebar — no light-surface
+     equivalent, so these aren't reused outside that context. */
+  --color-navy-muted: #8c98b3;
+  --color-navy-dim: #a9b4cc;
+  --color-navy-faint: #c3ccdd;
 
   /* Accent / state */
   --color-info: #3b82c4;
-  --color-danger: #b5342a;
-  --color-success: #2f855a;
+  --color-danger: #b42318;
+  --color-danger-tint: #fbe9e7;
+  --color-success: #1f7a4d;
+  --color-backdrop: rgba(18, 32, 61, 0.55);
 
   /* Typography */
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;

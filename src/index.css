@@ -17,6 +17,7 @@
 
 @import "./theme.css";
 @import "./components/ui/ui.css";
+@import "./components/dialogs/dialogs.css";
 
 /* Bridges the brand tokens above into Tailwind's own theme namespace so
    utilities like `bg-navy`, `text-gold`, and `font-display` are available.
@@ -24,11 +25,11 @@
    literal copies of the same values, not references, so Tailwind can read
    them at build time. */
 @theme {
-  --color-navy: #0b1c33;
-  --color-navy-mid: #16305a;
-  --color-gold: #f2b705;
-  --color-gold-hover: #d9a604;
-  --color-cream: #faf6ec;
+  --color-navy: #12203d;
+  --color-navy-mid: #1a2e52;
+  --color-gold: #d9a32a;
+  --color-gold-hover: #c0901f;
+  --color-cream: #f7f2e7;
 
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --font-sans: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
@@ -156,4 +157,14 @@ button {
   font-family: var(--font-sans) !important;
   font-size: 0.95rem !important;
   font-weight: 600 !important;
+}
+/* Drops the toast below the app's sticky topbar instead of overlapping it — the topbar's
+   real height is tracked into --app-topbar-height by AppShell (see ui/AppShell.tsx), since
+   it differs between the mobile and desktop layouts. */
+body.swal2-toast-shown .swal2-container.swal2-top,
+body.swal2-toast-shown .swal2-container.swal2-top-end,
+body.swal2-toast-shown .swal2-container.swal2-top-right,
+body.swal2-toast-shown .swal2-container.swal2-top-start,
+body.swal2-toast-shown .swal2-container.swal2-top-left {
+  top: calc(var(--app-topbar-height, 64px) + 0.75rem) !important;
 }

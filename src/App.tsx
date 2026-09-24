@@ -8,6 +8,7 @@ import AttendanceHeadcount from "./pages/AttendanceHeadcount";
 import AttendanceLifeGroups from "./pages/AttendanceLifeGroups";
 import AttendanceWorkers from "./pages/AttendanceWorkers";
 import Devotion from "./pages/Devotion";
+import DevModalsDemo from "./pages/DevModalsDemo";
 import ForgotPassword from "./pages/ForgotPassword";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
@@ -40,13 +41,16 @@ function App() {
         <Route path="/reports/congregation" element={<ReportsCongregation />} />
         <Route path="/reports/lifegroups" element={<ReportsLifeGroups />} />
         <Route path="/reports/devotions" element={<ReportsDevotions />} />
-        <Route path="/settings" element={<Settings />} />
+        <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
+        <Route path="/settings/:tab" element={<Settings />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/attendance" element={<Attendance />} />
         <Route path="/attendance/workers" element={<AttendanceWorkers />} />
         <Route path="/attendance/congregation" element={<AttendanceCongregation />} />
         <Route path="/attendance/headcount" element={<AttendanceHeadcount />} />
         <Route path="/attendance/lifegroups" element={<AttendanceLifeGroups />} />
+        {/* Not linked from navigation — a preview of the Modal/Toast/useConfirm system. */}
+        <Route path="/dev/modals" element={<DevModalsDemo />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
