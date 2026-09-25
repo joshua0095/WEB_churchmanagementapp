@@ -18,6 +18,19 @@ function base(props: SVGProps<SVGSVGElement>): SVGProps<SVGSVGElement> {
   };
 }
 
+/** Small chapel with a cross — Home's "Gather with the church" card. */
+export function ChurchIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg {...base(props)}>
+      <path d="M12 2v4M10 4h4" />
+      <path d="m6 11 6-5 6 5" />
+      <path d="M7 10v11h10V10" />
+      <path d="M10 21v-4a2 2 0 0 1 4 0v4" />
+      <path d="M4 21h16" />
+    </svg>
+  );
+}
+
 export function NavHomeIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>
@@ -107,15 +120,6 @@ export function TopbarSearchIcon(props: SVGProps<SVGSVGElement>) {
     <svg {...base(props)}>
       <circle cx="11" cy="11" r="7" />
       <path d="m21 21-4.3-4.3" />
-    </svg>
-  );
-}
-
-export function BellIcon(props: SVGProps<SVGSVGElement>) {
-  return (
-    <svg {...base(props)}>
-      <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
-      <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
     </svg>
   );
 }

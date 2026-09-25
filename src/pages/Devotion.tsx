@@ -1,25 +1,20 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   createAnnouncement,
   createDevotion,
   deleteDevotion,
+  getBibleVersions,
   getDevotions,
   updateDevotion,
   type Devotion as ApiDevotion,
   type DevotionRequest,
 } from "../api";
-import {
-  AppShell,
-  Button,
-  DropdownMenu,
-  Modal,
-  ProfileMenu,
-  SelectField,
-  Skeleton,
-  VersePicker,
-} from "../components/ui";
+import { Modal, useConfirm, useToast } from "../components/dialogs";
+import { AppShell, Button, DropdownMenu, ProfileMenu, Skeleton, VersePicker } from "../components/ui";
 import { StarIcon } from "../components/ui/icons";
-import { confirmDialog, errorToast, successToast } from "../swal";
+import { KebabIcon, NavDevotionIcon, TopbarSearchIcon } from "../components/ui/shellIcons";
+import { getBibleVersionId } from "../preferences";
 
 interface Devo {
   id: number;
@@ -75,6 +70,11 @@ function formatDate(d: Date): string {
   return `${full} (${weekday})`;
 }
 
+/** "September 19, 2026" — the muted date beside a card's reference. */
+function formatCardDate(d: Date): string {
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
+}
+
 function toDateInputValue(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -118,11 +118,11 @@ const FILTER_CHIPS: { key: FilterKey; label: string }[] = [
   { key: "verse", label: "By verse" },
 ];
 
-const SOAP_FIELDS = [
-  { key: "scripture", label: "Scripture", placeholder: "The verse or passage text — auto-filled when you pick a verse above, but you can edit it." },
-  { key: "observation", label: "Observation", placeholder: "What stands out to you in this passage? What is God showing you?" },
-  { key: "application", label: "Application", placeholder: "How will you apply this truth to your life today?" },
-  { key: "prayer", label: "Prayer", placeholder: "Write a short prayer responding to what you've read." },
+/** O / A / P steps — Scripture (S) has its own verse-picker markup. */
+const REFLECTION_STEPS = [
+  { key: "observation", letter: "O", label: "Observation", placeholder: "Write what you notice…", error: "Write what you notice in the passage." },
+  { key: "application", letter: "A", label: "Application", placeholder: "Today I will…", error: "Write how you'll apply it today." },
+  { key: "prayer", letter: "P", label: "Prayer", placeholder: "Lord, …", error: "Write a short prayer." },
 ] as const;
 
 interface DevoForm {
@@ -135,6 +135,8 @@ interface DevoForm {
   notes: string;
 }
 
+type FormErrors = Partial<Record<"verse" | "scripture" | "observation" | "application" | "prayer", string>>;
+
 const EMPTY_FORM: DevoForm = {
   date: toDateInputValue(new Date()),
   verse: "",
@@ -145,18 +147,59 @@ const EMPTY_FORM: DevoForm = {
   notes: "",
 };
 
+function validate(form: DevoForm): FormErrors {
+  const errors: FormErrors = {};
+  if (!form.verse.trim()) errors.verse = "Choose a verse to reflect on.";
+  else if (!form.scripture.trim()) errors.scripture = "Add the verse text.";
+  for (const step of REFLECTION_STEPS) {
+    if (!form[step.key].trim()) errors[step.key] = step.error;
+  }
+  return errors;
+}
+
+function StepHeading({ letter, label, htmlFor }: { letter: string; label: string; htmlFor?: string }) {
+  return (
+    <div className="devo-step-head">
+      <span className="devo-step-letter" aria-hidden="true">
+        {letter}
+      </span>
+      {htmlFor ? (
+        <label className="devo-step-title" htmlFor={htmlFor}>
+          {label}
+        </label>
+      ) : (
+        <span className="devo-step-title">{label}</span>
+      )}
+    </div>
+  );
+}
+
+function FieldError({ id, message }: { id: string; message?: string }) {
+  if (!message) return null;
+  return (
+    <p className="devo-field-error" id={id}>
+      {message}
+    </p>
+  );
+}
+
 function Devotion() {
+  const toast = useToast();
+  const confirm = useConfirm();
+
   const [devos, setDevos] = useState<Devo[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
-  const [groupBy, setGroupBy] = useState<GroupKey>("none");
+  const [groupBy, setGroupBy] = useState<GroupKey>("month");
 
   const [modal, setModal] = useState<{ mode: "add" | "edit" | "view"; devo: Devo | null } | null>(null);
   const [form, setForm] = useState<DevoForm>(EMPTY_FORM);
+  const [errors, setErrors] = useState<FormErrors>({});
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [versionLabel, setVersionLabel] = useState<string | null>(null);
 
   const loadDevotions = async () => {
     setLoading(true);
@@ -172,6 +215,17 @@ function Devotion() {
 
   useEffect(() => {
     loadDevotions();
+  }, []);
+
+  // The picker fetches in the devotion translation chosen in Settings; its abbreviation
+  // labels the verse chip. With no choice made the server default is used, which the API
+  // doesn't name, so the chip then shows just the reference.
+  useEffect(() => {
+    const versionId = getBibleVersionId("devotion");
+    if (!versionId) return;
+    getBibleVersions()
+      .then((versions) => setVersionLabel(versions.find((v) => v.id === versionId)?.abbreviation ?? null))
+      .catch(() => {});
   }, []);
 
   const visible = useMemo(() => {
@@ -218,7 +272,8 @@ function Devotion() {
   }, [visible, groupBy, filter]);
 
   const openAdd = () => {
-    setForm(EMPTY_FORM);
+    setForm({ ...EMPTY_FORM, date: toDateInputValue(new Date()) });
+    setErrors({});
     setModal({ mode: "add", devo: null });
   };
 
@@ -232,13 +287,37 @@ function Devotion() {
       prayer: devo.prayer,
       notes: devo.notes,
     });
+    setErrors({});
     setModal({ mode: "edit", devo });
   };
 
   const openView = (devo: Devo) => setModal({ mode: "view", devo });
   const closeModal = () => setModal(null);
 
-  const updateForm = (key: keyof DevoForm, value: string) => setForm((prev) => ({ ...prev, [key]: value }));
+  // Deep links from the Home screen's "Time in the Word" card: ?compose=today opens a new
+  // devotion for today, ?open=today opens today's devotion (or a new one if there isn't one
+  // yet). Handled once the list has loaded, then stripped so a refresh doesn't reopen it.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (loading) return;
+    const compose = searchParams.get("compose") === "today";
+    const open = searchParams.get("open") === "today";
+    if (!compose && !open) return;
+    const todays = open ? devos.find((d) => isSameDay(d.date, new Date())) : undefined;
+    if (todays) {
+      openView(todays);
+    } else {
+      setForm({ ...EMPTY_FORM, date: toDateInputValue(new Date()) });
+      setErrors({});
+      setModal({ mode: "add", devo: null });
+    }
+    setSearchParams({}, { replace: true });
+  }, [loading, devos, searchParams, setSearchParams]);
+
+  const updateForm = (key: keyof DevoForm, value: string) => {
+    setForm((prev) => ({ ...prev, [key]: value }));
+    if (key in errors) setErrors((prev) => ({ ...prev, [key]: undefined }));
+  };
 
   // Add: dirty once any field has been typed into (the date defaults to
   // today on its own, so that alone doesn't count). Edit: dirty once the
@@ -258,11 +337,11 @@ function Devotion() {
 
   const closeAddEditModal = async () => {
     if (isFormDirty) {
-      const message =
+      const confirmed = await confirm(
         modal?.mode === "edit"
-          ? "Discard your changes to this devotion?"
-          : "Discard this devotion? It won't be saved.";
-      const confirmed = await confirmDialog({ message, confirmLabel: "Discard", danger: true });
+          ? { title: "Discard your changes?", description: "Your edits to this devotion won't be saved.", confirmLabel: "Discard" }
+          : { title: "Discard this devotion?", description: "What you've written won't be saved.", confirmLabel: "Discard" },
+      );
       if (!confirmed) return;
     }
     closeModal();
@@ -270,15 +349,10 @@ function Devotion() {
 
   const handleSaveModal = async (e: FormEvent) => {
     e.preventDefault();
-    if (
-      !form.verse.trim() ||
-      !form.scripture.trim() ||
-      !form.observation.trim() ||
-      !form.application.trim() ||
-      !form.prayer.trim()
-    ) {
-      return;
-    }
+    const found = validate(form);
+    setErrors(found);
+    if (Object.keys(found).length > 0) return;
+
     const payload: DevotionRequest = {
       date: form.date,
       verse: form.verse.trim(),
@@ -292,15 +366,18 @@ function Devotion() {
     try {
       if (modal?.mode === "add") {
         await createDevotion(payload);
-        successToast("Devotion added");
       } else if (modal?.mode === "edit" && modal.devo) {
         await updateDevotion(modal.devo.id, payload);
-        successToast("Devotion updated");
       }
+      toast.show({ type: "success", title: "Devotion saved" });
       await loadDevotions();
       closeModal();
     } catch (err) {
-      errorToast(err instanceof Error ? err.message : "Failed to save devotion.");
+      toast.show({
+        type: "error",
+        title: "Couldn't save devotion",
+        message: err instanceof Error ? err.message : "Please try again.",
+      });
     } finally {
       setSaving(false);
     }
@@ -318,21 +395,33 @@ function Devotion() {
         notes: devo.notes,
       });
       await loadDevotions();
-      successToast("Devotion duplicated");
+      toast.show({ type: "success", title: "Devotion duplicated" });
     } catch (err) {
-      errorToast(err instanceof Error ? err.message : "Failed to duplicate devotion.");
+      toast.show({
+        type: "error",
+        title: "Couldn't duplicate devotion",
+        message: err instanceof Error ? err.message : "Please try again.",
+      });
     }
   };
 
-  const handleDelete = async (id: number) => {
-    const confirmed = await confirmDialog({ message: "Delete this devotion?", confirmLabel: "Delete", danger: true });
+  const handleDelete = async (devo: Devo) => {
+    const confirmed = await confirm({
+      title: "Delete this devotion?",
+      description: `${devo.verse} · ${formatCardDate(devo.date)}. This can't be undone.`,
+      confirmLabel: "Delete",
+    });
     if (!confirmed) return;
     try {
-      await deleteDevotion(id);
+      await deleteDevotion(devo.id);
       await loadDevotions();
-      successToast("Devotion deleted");
+      toast.show({ type: "success", title: "Devotion deleted" });
     } catch (err) {
-      errorToast(err instanceof Error ? err.message : "Failed to delete devotion.");
+      toast.show({
+        type: "error",
+        title: "Couldn't delete devotion",
+        message: err instanceof Error ? err.message : "Please try again.",
+      });
     }
   };
 
@@ -344,177 +433,187 @@ function Devotion() {
         content: null,
         imageDataUrl: null,
       });
-      successToast(`Shared "${devo.verse}" to Announcements.`);
+      toast.show({ type: "success", title: "Shared to Announcements", message: devo.verse });
     } catch (err) {
-      errorToast(err instanceof Error ? err.message : "Failed to share to Announcements.");
+      toast.show({
+        type: "error",
+        title: "Couldn't share to Announcements",
+        message: err instanceof Error ? err.message : "Please try again.",
+      });
     }
   };
 
+  const formLocked = !!duplicateDateDevo;
+
   return (
     <AppShell headerRight={<ProfileMenu />}>
-      <div className="page-header">
-        <h1>Devotions</h1>
-        <Button type="button" onClick={openAdd}>
-          + Add Devotion
-        </Button>
-      </div>
-
-      <div className="mb-5 flex flex-col gap-4">
-        <input
-          type="text"
-          placeholder="Search devotions..."
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          aria-label="Search devotions"
-          className="h-11 w-full rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-sm text-[var(--color-text-primary)] outline-none transition-shadow focus:border-[var(--color-gold)] focus:shadow-[0_0_0_3px_rgba(242,183,5,0.25)]"
-        />
-
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap gap-2">
-            {FILTER_CHIPS.map((chip) => (
-              <button
-                key={chip.key}
-                type="button"
-                onClick={() => setFilter(chip.key)}
-                className={[
-                  "rounded-full border px-3.5 py-1.5 text-sm font-semibold transition-colors",
-                  filter === chip.key
-                    ? "border-[var(--color-navy)] bg-[var(--color-navy)] text-white"
-                    : "border-[var(--color-border)] bg-[var(--color-surface)] text-[var(--color-text-secondary)] hover:border-[var(--color-navy)] hover:text-[var(--color-navy)]",
-                ].join(" ")}
-              >
-                {chip.label}
-              </button>
-            ))}
-            <button
-              type="button"
-              disabled
-              title="Favorites need a new field on the devotion model — see note below the list."
-              className="flex cursor-not-allowed items-center gap-1.5 rounded-full border border-[var(--color-border)] bg-[var(--color-surface)] px-3.5 py-1.5 text-sm font-semibold text-[var(--color-text-secondary)] opacity-50"
-            >
-              <StarIcon />
-              Favorites
-            </button>
+      <div className="devo-page">
+        <div className="devo-header">
+          <div>
+            <h1 className="devo-title">Devotions</h1>
+            <p className="devo-subtitle">Your SOAP journal: Scripture, Observation, Application, Prayer.</p>
           </div>
-
-          <SelectField
-            label="Group by"
-            value={groupBy}
-            onChange={(e) => setGroupBy(e.target.value as GroupKey)}
-            className="min-w-40"
-          >
-            <option value="none">None</option>
-            <option value="week">Week</option>
-            <option value="month">Month</option>
-          </SelectField>
+          <button type="button" className="devo-write-btn" onClick={openAdd} aria-label="Write devotion">
+            <span className="devo-write-long" aria-hidden="true">
+              + Write devotion
+            </span>
+            <span className="devo-write-short" aria-hidden="true">
+              + Write
+            </span>
+          </button>
         </div>
-      </div>
 
-      {loading ? (
-        <div className="flex flex-col gap-3">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)]">
-              <div className="flex items-center justify-between gap-3">
-                <Skeleton className="h-5 w-44" />
-                <Skeleton className="h-8 w-8 rounded-full" />
-              </div>
-              <Skeleton className="mt-2 h-4 w-28" />
-              <Skeleton className="mt-3 h-4 w-full" />
-              <Skeleton className="mt-1.5 h-4 w-3/4" />
-            </div>
+        <div className="devo-toolbar">
+          <label className="devo-search">
+            <TopbarSearchIcon />
+            <input
+              type="search"
+              placeholder="Search by verse or words"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              aria-label="Search devotions"
+            />
+          </label>
+          <label className="devo-groupby">
+            <span>Group by</span>
+            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupKey)}>
+              <option value="none">None</option>
+              <option value="week">Week</option>
+              <option value="month">Month</option>
+            </select>
+          </label>
+        </div>
+
+        <div className="devo-chips" role="group" aria-label="Filter devotions">
+          {FILTER_CHIPS.map((chip) => (
+            <button
+              key={chip.key}
+              type="button"
+              className="devo-chip"
+              aria-pressed={filter === chip.key}
+              onClick={() => setFilter(chip.key)}
+            >
+              {chip.label}
+            </button>
           ))}
+          <button type="button" className="devo-chip devo-chip--soon" disabled>
+            Favorites <span className="devo-soon">Soon</span>
+          </button>
         </div>
-      ) : loadError ? (
-        <p className="error">{loadError}</p>
-      ) : visible.length === 0 ? (
-        <p className="helper-text">
-          {devos.length === 0 ? "No devotions yet." : "No devotions match your search or filter."}
-        </p>
-      ) : (
-        <div className="flex flex-col gap-6">
-          {groups.map((group) => (
-            <div key={group.key} className="flex flex-col gap-3">
-              {group.label && (
-                <h2 className="font-display text-sm font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                  {group.label}
-                </h2>
-              )}
-              <div className="flex flex-col gap-3">
-                {group.items.map((devo) => {
-                  const today = isSameDay(devo.date, new Date());
-                  return (
-                    <article
-                      key={devo.id}
-                      className={[
-                        "rounded-md bg-[var(--color-surface)] p-4 shadow-[var(--shadow-card)] transition-shadow hover:shadow-[var(--shadow-pop)]",
-                        today
-                          ? "border border-l-4 border-[var(--color-border)] border-l-[var(--color-gold)]"
-                          : "border border-[var(--color-border)]",
-                      ].join(" ")}
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="font-display text-base font-bold text-[var(--color-navy)]">
-                            {formatDate(devo.date)}
-                          </span>
-                          {today && (
-                            <span className="inline-flex items-center rounded-full bg-[var(--color-gold)] px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-[var(--color-text-on-gold)]">
-                              Today
-                            </span>
-                          )}
-                        </div>
+
+        {loading ? (
+          <div className="devo-list" aria-hidden="true">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="devo-card">
+                <Skeleton className="devo-tile-skeleton rounded-xl" />
+                <div className="devo-card-body">
+                  <Skeleton className="h-4 w-44" />
+                  <Skeleton className="mt-2.5 h-5 w-full" />
+                  <Skeleton className="mt-2.5 h-3.5 w-2/3" />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : loadError ? (
+          <p className="error">{loadError}</p>
+        ) : visible.length === 0 ? (
+          <p className="helper-text">
+            {devos.length === 0 ? "No devotions yet." : "No devotions match your search or filter."}
+          </p>
+        ) : (
+          <div className="devo-groups">
+            {groups.map((group) => (
+              <section key={group.key} aria-label={group.label ?? "Devotions"}>
+                {group.label && (
+                  <h2 className="devo-group-head">
+                    {group.label}
+                    <span className="devo-group-count">
+                      {group.items.length} {group.items.length === 1 ? "devotion" : "devotions"}
+                    </span>
+                  </h2>
+                )}
+                <div className="devo-list">
+                  {group.items.map((devo) => (
+                    <article key={devo.id} className="devo-card">
+                      <div className="devo-date-tile" aria-hidden="true">
+                        <span className="devo-date-day">{String(devo.date.getDate()).padStart(2, "0")}</span>
+                        <span className="devo-date-weekday">
+                          {devo.date.toLocaleDateString("en-US", { weekday: "short" })}
+                        </span>
+                      </div>
+                      <div className="devo-card-body">
+                        <p className="devo-card-meta">
+                          {/* Stretched over the whole card (see .devo-card-open::after) so a click
+                              anywhere opens the devotion, while staying a real, focusable button. */}
+                          <button
+                            type="button"
+                            className="devo-card-open"
+                            onClick={() => openView(devo)}
+                            aria-label={`Open devotion: ${devo.verse}, ${formatCardDate(devo.date)}`}
+                          >
+                            {devo.verse}
+                          </button>
+                          <span className="devo-card-date">{formatCardDate(devo.date)}</span>
+                        </p>
+                        {devo.scripture && <p className="devo-card-scripture">“{devo.scripture}”</p>}
+                        {devo.observation && (
+                          <p className="devo-card-observation">
+                            <strong>Observation:</strong> {devo.observation}
+                          </p>
+                        )}
+                      </div>
+                      <div className="devo-card-actions" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          className="devo-icon-btn"
+                          disabled
+                          aria-label="Favorite (coming soon)"
+                          title="Favorites are coming soon"
+                        >
+                          <StarIcon />
+                        </button>
                         <DropdownMenu
+                          icon={<KebabIcon />}
+                          triggerClassName="devo-icon-btn"
                           ariaLabel={`Actions for ${devo.verse}`}
                           items={[
                             { label: "Edit", onSelect: () => openEdit(devo) },
                             { label: "View full devotion", onSelect: () => openView(devo) },
                             { label: "Duplicate", onSelect: () => handleDuplicate(devo) },
                             { label: "Share to announcements", onSelect: () => handleShare(devo) },
-                            {
-                              label: "Delete",
-                              onSelect: () => handleDelete(devo.id),
-                              danger: true,
-                              dividerBefore: true,
-                            },
+                            { label: "Delete", onSelect: () => handleDelete(devo), danger: true, dividerBefore: true },
                           ]}
                         />
                       </div>
-                      <p className="mt-1 text-sm font-semibold text-[var(--color-text-secondary)]">{devo.verse}</p>
-                      <p className="mt-2 line-clamp-2 text-sm leading-relaxed text-[var(--color-text-primary)]">
-                        {truncate(devo.observation || devo.scripture)}
-                      </p>
                     </article>
-                  );
-                })}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <p className="mt-6 text-xs text-[var(--color-text-secondary)]">
-        Favorites filter is disabled — see the summary for what it needs before it can go live.
-      </p>
+                  ))}
+                </div>
+              </section>
+            ))}
+          </div>
+        )}
+      </div>
 
       <Modal
         open={modal?.mode === "add" || modal?.mode === "edit"}
-        onClose={closeAddEditModal}
-        title={modal?.mode === "edit" ? "Edit Devotion" : "Add Devotion"}
+        // While the verse picker is open on top, its own Esc/close handles it — without this
+        // guard the same Esc keypress would also close (or prompt to discard) this form.
+        onClose={pickerOpen ? () => {} : closeAddEditModal}
         size="lg"
-        closeOnBackdropClick={false}
+        title={modal?.mode === "edit" ? "Edit devotion" : "New devotion"}
         footer={
           <>
-            <Button type="button" variant="secondary" onClick={closeAddEditModal}>
+            <Button type="button" variant="outline" onClick={closeAddEditModal}>
               Cancel
             </Button>
-            <Button type="submit" form="devo-form" disabled={!!duplicateDateDevo || saving}>
-              {saving ? "Saving..." : "Save Devotion"}
+            <Button type="submit" form="devo-form" disabled={formLocked || saving}>
+              {saving ? "Saving…" : "Save devotion"}
             </Button>
           </>
         }
       >
-        <form id="devo-form" onSubmit={handleSaveModal} className="flex flex-col gap-4">
-          <label className="ui-field">
+        <form id="devo-form" onSubmit={handleSaveModal} noValidate className="devo-form">
+          <label className="ui-field devo-date-field">
             <span className="ui-field-label">Date</span>
             <input
               className="ui-field-input"
@@ -526,71 +625,93 @@ function Devotion() {
           </label>
 
           {duplicateDateDevo && (
-            <div className="flex flex-col items-start rounded-md border border-amber-300 bg-amber-50 px-3.5 py-2.5 text-sm text-amber-900">
-              <p className="m-1">
+            <div className="devo-duplicate" role="status">
+              <p className="m-0">
                 You already have a devotion for{" "}
                 {isSameDay(parseDateInputValue(form.date), new Date())
                   ? "today"
                   : formatDate(parseDateInputValue(form.date))}
                 . Change the date to add a new devotion, or edit the existing one instead.
               </p>
-              <button
-                type="button"
-                onClick={() => openEdit(duplicateDateDevo)}
-                className="mt-0 rounded-md border-0 bg-amber-900 px-3.5 py-1.5 text-sm font-semibold text-amber-50 transition-opacity hover:opacity-90"
-              >
+              <Button type="button" variant="secondary" onClick={() => openEdit(duplicateDateDevo)}>
                 Edit that devotion instead
-              </button>
+              </Button>
             </div>
           )}
 
-          <div className="ui-field">
-            <span className="ui-field-label">Scripture reference</span>
-            <div className="flex gap-2">
-              <input
-                className="ui-field-input flex-1 disabled:opacity-60"
-                value={form.verse}
-                readOnly
-                disabled={!!duplicateDateDevo}
-                placeholder="No verse selected yet"
-              />
-              <Button
+          <div className="devo-step">
+            <StepHeading letter="S" label="Scripture" htmlFor={form.verse ? "devo-scripture" : undefined} />
+            {form.verse ? (
+              <div className="devo-verse-row">
+                <span className="devo-verse-chip">
+                  <NavDevotionIcon />
+                  {form.verse}
+                  {versionLabel ? ` · ${versionLabel}` : ""}
+                </span>
+                <button type="button" className="devo-link-btn" onClick={() => setPickerOpen(true)} disabled={formLocked}>
+                  Change verse
+                </button>
+              </div>
+            ) : (
+              <button
                 type="button"
-                variant="secondary"
+                className="devo-choose-verse"
                 onClick={() => setPickerOpen(true)}
-                disabled={!!duplicateDateDevo}
+                disabled={formLocked}
+                aria-describedby={errors.verse ? "devo-verse-error" : undefined}
               >
-                Select verse
-              </Button>
-            </div>
+                <NavDevotionIcon />
+                Choose a verse
+              </button>
+            )}
+            <FieldError id="devo-verse-error" message={errors.verse} />
+            {form.verse && (
+              <>
+                <textarea
+                  id="devo-scripture"
+                  ref={autoGrowRef}
+                  className="devo-textarea devo-textarea--scripture"
+                  value={form.scripture}
+                  onChange={(e) => updateForm("scripture", e.target.value)}
+                  onInput={(e) => autoGrowRef(e.currentTarget)}
+                  disabled={formLocked}
+                  aria-invalid={!!errors.scripture}
+                  aria-describedby={errors.scripture ? "devo-scripture-error" : undefined}
+                />
+                <FieldError id="devo-scripture-error" message={errors.scripture} />
+              </>
+            )}
           </div>
 
-          {SOAP_FIELDS.map((field) => (
-            <label key={field.key} className="ui-field">
-              <span className="ui-field-label">{field.label}</span>
+          {REFLECTION_STEPS.map((step) => (
+            <div key={step.key} className="devo-step">
+              <StepHeading letter={step.letter} label={step.label} htmlFor={`devo-${step.key}`} />
               <textarea
+                id={`devo-${step.key}`}
                 ref={autoGrowRef}
-                className="min-h-36 w-full resize-y rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 font-sans text-sm text-[var(--color-text-primary)] outline-none transition-shadow focus:border-[var(--color-gold)] focus:shadow-[0_0_0_3px_rgba(242,183,5,0.25)] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-28"
-                value={form[field.key]}
-                onChange={(e) => updateForm(field.key, e.target.value)}
+                className="devo-textarea"
+                value={form[step.key]}
+                onChange={(e) => updateForm(step.key, e.target.value)}
                 onInput={(e) => autoGrowRef(e.currentTarget)}
-                placeholder={field.placeholder}
-                disabled={!!duplicateDateDevo}
-                required
+                placeholder={step.placeholder}
+                disabled={formLocked}
+                aria-invalid={!!errors[step.key]}
+                aria-describedby={errors[step.key] ? `devo-${step.key}-error` : undefined}
               />
-            </label>
+              <FieldError id={`devo-${step.key}-error`} message={errors[step.key]} />
+            </div>
           ))}
 
           <label className="ui-field">
-            <span className="ui-field-label">Notes / comments (optional)</span>
+            <span className="ui-field-label">Notes (optional)</span>
             <textarea
               ref={autoGrowRef}
-              className="min-h-24 w-full resize-none overflow-hidden rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2.5 font-sans text-sm text-[var(--color-text-primary)] outline-none transition-shadow focus:border-[var(--color-gold)] focus:shadow-[0_0_0_3px_rgba(242,183,5,0.25)] disabled:cursor-not-allowed disabled:opacity-60 sm:min-h-20"
+              className="devo-textarea"
               value={form.notes}
               onChange={(e) => updateForm("notes", e.target.value)}
               onInput={(e) => autoGrowRef(e.currentTarget)}
-              placeholder="Anything else you'd like to remember (optional)."
-              disabled={!!duplicateDateDevo}
+              placeholder="Anything else you'd like to remember."
+              disabled={formLocked}
             />
           </label>
         </form>
@@ -601,6 +722,7 @@ function Devotion() {
         onClose={() => setPickerOpen(false)}
         onSelect={(result) => {
           setForm((prev) => ({ ...prev, verse: result.reference, scripture: result.text }));
+          setErrors((prev) => ({ ...prev, verse: undefined, scripture: undefined }));
           setPickerOpen(false);
         }}
       />
@@ -609,31 +731,36 @@ function Devotion() {
         open={modal?.mode === "view"}
         onClose={closeModal}
         title={modal?.devo?.verse ?? "Devotion"}
+        description={modal?.devo ? formatDate(modal.devo.date) : undefined}
         footer={
-          <Button type="button" onClick={closeModal}>
-            Close
-          </Button>
+          <>
+            {modal?.devo && (
+              <Button type="button" variant="outline" onClick={() => modal.devo && openEdit(modal.devo)}>
+                Edit
+              </Button>
+            )}
+            <Button type="button" onClick={closeModal}>
+              Close
+            </Button>
+          </>
         }
       >
         {modal?.devo && (
           <div className="flex flex-col gap-4">
-            <p className="text-xs text-[var(--color-text-secondary)]">{formatDate(modal.devo.date)}</p>
             {(
               [
-                ["Scripture", modal.devo.scripture],
-                ["Observation", modal.devo.observation],
-                ["Application", modal.devo.application],
-                ["Prayer", modal.devo.prayer],
-                ["Notes", modal.devo.notes],
+                ["S", "Scripture", modal.devo.scripture],
+                ["O", "Observation", modal.devo.observation],
+                ["A", "Application", modal.devo.application],
+                ["P", "Prayer", modal.devo.prayer],
+                ["", "Notes", modal.devo.notes],
               ] as const
             )
-              .filter(([, value]) => value.trim().length > 0)
-              .map(([label, value]) => (
-                <div key={label}>
-                  <p className="font-display text-sm font-bold text-[var(--color-navy)]">{label}</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-[var(--color-text-primary)]">
-                    {value}
-                  </p>
+              .filter(([, , value]) => value.trim().length > 0)
+              .map(([letter, label, value]) => (
+                <div key={label} className="devo-step">
+                  {letter ? <StepHeading letter={letter} label={label} /> : <p className="ui-field-label m-0">{label}</p>}
+                  <p className={letter === "S" ? "devo-view-text devo-view-text--scripture" : "devo-view-text"}>{value}</p>
                 </div>
               ))}
           </div>

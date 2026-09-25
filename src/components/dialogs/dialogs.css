@@ -36,6 +36,9 @@
 .modal--md {
   max-width: 560px;
 }
+.modal--lg {
+  max-width: 720px;
+}
 
 .modal-ribbon {
   position: absolute;
@@ -98,6 +101,8 @@
 }
 
 .modal-body {
+  flex: 1 1 auto;
+  min-height: 0;
   padding: 4px 28px 28px;
   display: flex;
   flex-direction: column;
@@ -209,7 +214,8 @@
   }
   .modal,
   .modal--sm,
-  .modal--md {
+  .modal--md,
+  .modal--lg {
     max-width: none;
     max-height: 92vh;
     border-radius: 24px 24px 0 0;
@@ -219,6 +225,12 @@
   }
   .modal-backdrop--open .modal {
     transform: none;
+  }
+  /* A long form gets a near-full-height sheet rather than one that grows with its content. */
+  .modal--lg {
+    height: 94vh;
+    height: 94dvh;
+    max-height: none;
   }
   .modal-handle {
     display: flex;

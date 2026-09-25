@@ -5,7 +5,6 @@ import { useMe, setCachedMe } from "../../meCache";
 import { getSidebarCollapsed, setSidebarCollapsed } from "../../preferences";
 import { InitialAvatar } from "../PeopleShared";
 import {
-  BellIcon,
   CollapseSidebarIcon,
   MoreNavIcon,
   NavAnnouncementsIcon,
@@ -17,7 +16,6 @@ import {
   NavReportsIcon,
   NavSettingsIcon,
   ShellLogOutIcon,
-  TopbarSearchIcon,
 } from "./shellIcons";
 import Logo from "./Logo";
 
@@ -104,12 +102,15 @@ const BREADCRUMBS: Record<string, { section: string; title: string }> = {
 interface AppShellProps {
   children: ReactNode;
   headerRight?: ReactNode;
+  /** Extra class on the page content wrapper, for a page that needs its own width/padding
+   * (e.g. Home's full-bleed mobile banner). */
+  pageClassName?: string;
 }
 
 /** Authenticated app layout: a persistent (collapsible) sidebar + top bar on desktop
  * (≥1024px), collapsing to a navy top bar + fixed bottom tab bar with a "More" sheet
  * on mobile. */
-function AppShell({ children, headerRight }: AppShellProps) {
+function AppShell({ children, headerRight, pageClassName }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
   const [manualExpanded, setManualExpanded] = useState<Record<string, boolean>>({});
   const [moreOpen, setMoreOpen] = useState(false);
@@ -305,16 +306,6 @@ function AppShell({ children, headerRight }: AppShellProps) {
             </div>
           )}
           <div className="flex-grow" />
-          <label className="app-search">
-            <TopbarSearchIcon />
-            <input type="search" placeholder="Search members, devotions…" aria-label="Search" />
-            <span className="app-search-kbd">Ctrl K</span>
-          </label>
-          <button type="button" className="app-topbar-iconbtn" aria-label="Notifications">
-            <BellIcon />
-            <span className="app-notif-dot" aria-hidden="true" />
-          </button>
-          <div className="app-topbar-divider" />
           {headerRight}
         </header>
 
@@ -325,14 +316,10 @@ function AppShell({ children, headerRight }: AppShellProps) {
             <div className="app-topbar-mobile-name">JIL Norzagaray</div>
             <div className="app-topbar-mobile-tag">Connect</div>
           </div>
-          <button type="button" className="app-mobile-iconbtn" aria-label="Notifications">
-            <BellIcon />
-            <span className="app-notif-dot" aria-hidden="true" />
-          </button>
           {headerRight}
         </header>
 
-        <div className="page">{children}</div>
+        <div className={["page", pageClassName].filter(Boolean).join(" ")}>{children}</div>
 
         {/* Mobile bottom tab bar */}
         <nav aria-label="Main" className="app-bottom-nav" style={{ gridTemplateColumns: `repeat(${visibleMobileTabs.length + 1}, minmax(0, 1fr))` }}>
@@ -346,7 +333,6 @@ function AppShell({ children, headerRight }: AppShellProps) {
                 aria-current={active ? "page" : undefined}
                 onClick={() => item.to && goTo(item.to)}
               >
-                {active && <span className="app-nav-ribbon app-nav-ribbon--tab" aria-hidden="true" />}
                 <span className={["app-bottom-tab-icon", active && "app-bottom-tab-icon--active"].filter(Boolean).join(" ")}>
                   {item.icon}
                 </span>

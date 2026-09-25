@@ -70,6 +70,15 @@ const SETTINGS_TABS: { key: SettingsTab; label: string; desc: string }[] = [
   { key: "access", label: "Access", desc: "Module permissions" },
 ];
 
+// Column headers for the module-access matrix on narrow screens, where the full names
+// ("Announcements") can't fit a 56px column without breaking mid-word.
+const MODULE_SHORT_LABELS: Record<ModuleName, string> = {
+  Attendance: "Attend.",
+  Reports: "Reports",
+  Announcements: "Announce.",
+  People: "People",
+};
+
 // Sourced from the real RosterScope union (a Record here means TS errors if that type ever
 // gains/drops a member without this being updated) rather than a hardcoded options list.
 const ROSTER_LABELS: Record<RosterScope, string> = {
@@ -329,9 +338,14 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
         }}
       >
         <span className="settings-code">{lifeGroupCode(group.id)}</span>
-        <span>
+        <span className="min-w-0">
           <span className="settings-group-name block">{group.groupName}</span>
           <span className="settings-group-leader block">Led by {group.leaderName}</span>
+          {/* Narrow screens hide the Type/Network/Members columns, so they're summarized here. */}
+          <span className="settings-group-meta">
+            {group.category} · {group.networkName ?? "No network"} · {group.memberCount}{" "}
+            {group.memberCount === 1 ? "member" : "members"}
+          </span>
         </span>
         <span className={["settings-chip", group.category === "Community" ? "settings-chip--community" : "settings-chip--church"].join(" ")}>
           {group.category}
@@ -365,7 +379,7 @@ function LifeGroupRow({ group, congregation, onEdit, onMemberAdded }: LifeGroupR
                       }}
                       aria-label={`Remove ${m.name}`}
                       title="Remove member"
-                      className="flex shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent p-1 text-[var(--color-text-secondary)] hover:text-[var(--color-danger)]"
+                      className="flex h-9 w-9 shrink-0 cursor-pointer items-center justify-center rounded border-0 bg-transparent p-0 text-[var(--color-text-secondary)] hover:text-[var(--color-danger)]"
                     >
                       <TrashIcon className="h-4 w-4" />
                     </button>
@@ -869,7 +883,7 @@ function Settings() {
 
           <div className="flex flex-col gap-6">
             {activeTab === "general" && (
-              <Card className="!rounded-2xl !p-0" id="panel-general" role="tabpanel" aria-labelledby="tab-general">
+              <Card className="settings-panel !rounded-2xl !p-0" id="panel-general" role="tabpanel" aria-labelledby="tab-general">
                 <div className="card-head border-b border-[var(--color-line)] px-7 pb-5 pt-6">
                   <div>
                     <h2 className="m-0 font-display text-xl font-semibold text-[var(--color-text-primary)]">Bible version</h2>
@@ -913,7 +927,7 @@ function Settings() {
             )}
 
             {canManageAccess && activeTab === "attendance" && (
-              <Card className="!rounded-2xl !p-0" id="panel-attendance" role="tabpanel" aria-labelledby="tab-attendance">
+              <Card className="settings-panel !rounded-2xl !p-0" id="panel-attendance" role="tabpanel" aria-labelledby="tab-attendance">
                 <div className="card-head px-7 pb-5 pt-6">
                   <div>
                     <h2 className="m-0 font-display text-xl font-semibold text-[var(--color-text-primary)]">Attendance events</h2>
@@ -944,13 +958,18 @@ function Settings() {
                         disabled={savingEventId === event.id}
                         onChange={(value) => handleChangeRosterScope(event, value)}
                       />
-                      <Switch
-                        className="settings-cell-center"
-                        checked={event.sundayOnly}
-                        disabled={savingEventId === event.id}
-                        onChange={() => handleToggleSundayOnly(event)}
-                        aria-label={`Sunday only for ${event.name}`}
-                      />
+                      <div className="settings-att-sunday">
+                        {/* Stands in for the hidden column header on narrow screens. */}
+                        <span className="settings-att-sunday-label" aria-hidden="true">
+                          Sunday only
+                        </span>
+                        <Switch
+                          checked={event.sundayOnly}
+                          disabled={savingEventId === event.id}
+                          onChange={() => handleToggleSundayOnly(event)}
+                          aria-label={`Sunday only for ${event.name}`}
+                        />
+                      </div>
                     </div>
                   ))
                 )}
@@ -966,7 +985,7 @@ function Settings() {
             )}
 
             {canManageAccess && activeTab === "lifegroups" && (
-              <Card className="!rounded-2xl !p-0" id="panel-lifegroups" role="tabpanel" aria-labelledby="tab-lifegroups">
+              <Card className="settings-panel !rounded-2xl !p-0" id="panel-lifegroups" role="tabpanel" aria-labelledby="tab-lifegroups">
                 <div className="card-head px-7 pb-5 pt-6">
                   <div>
                     <h2 className="m-0 font-display text-xl font-semibold text-[var(--color-text-primary)]">
@@ -976,9 +995,11 @@ function Settings() {
                       Leaders, networks and group type. This is what shows up when taking roll for a group.
                     </p>
                   </div>
-                  <Button type="button" onClick={openAddLifeGroup} className="shrink-0">
-                    + Add Life Group
-                  </Button>
+                  <div className="settings-head-actions">
+                    <Button type="button" onClick={openAddLifeGroup}>
+                      + Add Life Group
+                    </Button>
+                  </div>
                 </div>
                 <div className="settings-toolbar">
                   <label className="app-search">
@@ -1040,7 +1061,7 @@ function Settings() {
             )}
 
             {canManageAccess && activeTab === "networks" && (
-              <Card className="!rounded-2xl !p-0 pb-3" id="panel-networks" role="tabpanel" aria-labelledby="tab-networks">
+              <Card className="settings-panel !rounded-2xl !p-0 pb-3" id="panel-networks" role="tabpanel" aria-labelledby="tab-networks">
                 <div className="card-head px-7 pb-5 pt-6">
                   <div>
                     <h2 className="m-0 font-display text-xl font-semibold text-[var(--color-text-primary)]">Networks &amp; ministries</h2>
@@ -1048,7 +1069,7 @@ function Settings() {
                       Each network holds its ministries. Members are assigned to these on their profile.
                     </p>
                   </div>
-                  <div className="flex shrink-0 gap-2">
+                  <div className="settings-head-actions">
                     <Button type="button" variant="outline" onClick={openAddMinistry}>
                       + Add ministry
                     </Button>
@@ -1076,7 +1097,7 @@ function Settings() {
             )}
 
             {canManageAccess && activeTab === "access" && (
-              <Card className="!rounded-2xl !p-0 pb-2" id="panel-access" role="tabpanel" aria-labelledby="tab-access">
+              <Card className="settings-panel !rounded-2xl !p-0 pb-2" id="panel-access" role="tabpanel" aria-labelledby="tab-access">
                 <div className="card-head px-7 pb-4 pt-6">
                   <div>
                     <h2 className="m-0 font-display text-xl font-semibold text-[var(--color-text-primary)]">Module access</h2>
@@ -1092,8 +1113,11 @@ function Settings() {
                 <div className="settings-thead settings-cols-access">
                   <span>Network</span>
                   {ACCESS_MODULES.map((mod) => (
-                    <span key={mod} className="settings-cell-center">
-                      {mod}
+                    <span key={mod} className="settings-cell-center" title={mod}>
+                      <span className="settings-mod-full">{mod}</span>
+                      <span className="settings-mod-short" aria-hidden="true">
+                        {MODULE_SHORT_LABELS[mod]}
+                      </span>
                     </span>
                   ))}
                 </div>

@@ -4,7 +4,7 @@ import { CheckThinIcon } from "../ui/shellIcons";
 import { CloseXIcon, TrashTileIcon } from "./icons";
 
 export type ModalVariant = "form" | "confirm" | "success";
-export type ModalSize = "sm" | "md";
+export type ModalSize = "sm" | "md" | "lg";
 
 export interface ModalProps {
   open: boolean;
@@ -14,7 +14,8 @@ export interface ModalProps {
    * person must pick a footer button. "success": a celebratory centered panel for a big
    * moment (see useConfirm/ToastProvider for everyday confirms/saves instead). */
   variant?: ModalVariant;
-  /** Defaults to "sm" for confirm/success, "md" for form — matches every use in the reference. */
+  /** sm 440px, md 560px, lg 720px (a long form, e.g. a devotion — also a ~94%-tall sheet on
+   * mobile). Defaults to "sm" for confirm/success, "md" for form. */
   size?: ModalSize;
   title: string;
   description?: string;

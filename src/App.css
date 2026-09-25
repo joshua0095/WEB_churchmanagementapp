@@ -90,37 +90,6 @@
     margin: 0;
   }
 
-  /* ---------- Home ---------- */
-  .home {
-    display: flex;
-    flex-direction: column;
-    gap: 1.75rem;
-  }
-
-  .welcome {
-    font-size: 1.25rem;
-    margin: 0;
-  }
-
-  .welcome-subtitle {
-    color: var(--color-text-secondary);
-    font-size: 0.95rem;
-    margin: 0.35rem 0 0;
-  }
-
-  .home-highlights {
-    display: flex;
-    flex-direction: column;
-    gap: 1.75rem;
-  }
-  @media (min-width: 900px) {
-    .home-highlights {
-      display: grid;
-      grid-template-columns: 1.3fr 1fr;
-      gap: 1.5rem;
-    }
-  }
-
   /* The Devotion page is implemented with Tailwind utility classes
      directly in Devotion.tsx — no rules needed here. */
 }

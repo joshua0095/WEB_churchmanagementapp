@@ -57,7 +57,7 @@ function Modal({
   const large = size === "lg";
 
   return (
-    <div className={large ? "fixed inset-0 z-50 sm:flex sm:items-center sm:justify-center sm:p-4" : "fixed inset-0 z-50 flex items-center justify-center p-4"}>
+    <div className={large ? "fixed inset-0 z-[110] sm:flex sm:items-center sm:justify-center sm:p-4" : "fixed inset-0 z-[110] flex items-center justify-center p-4"}>
       <div
         className={large ? "hidden bg-black/50 sm:fixed sm:inset-0 sm:block" : "absolute inset-0 bg-black/50"}
         onClick={closeOnBackdropClick ? onClose : undefined}

@@ -110,8 +110,10 @@ function TreeList({ tree, onEditNetwork, onDeleteNetwork, onEditMinistry, onDele
                 <NavChevronIcon className={expanded ? "" : "-rotate-90"} />
               </button>
               <span className="tree-code">{abbreviateNetworkName(root.network.name)}</span>
-              <span className="tree-card-name">{root.network.name}</span>
-              <span className="tree-card-count">{count}</span>
+              <span className="tree-card-title">
+                <span className="tree-card-name">{root.network.name}</span>
+                <span className="tree-card-count">{count}</span>
+              </span>
               <DropdownMenu
                 {...KEBAB_PROPS}
                 ariaLabel={`Actions for ${root.network.name}`}
