@@ -1730,6 +1730,12 @@
   flex-direction: column;
   gap: 28px;
   margin-top: 4px;
+  scroll-margin-top: calc(var(--app-topbar-height, 64px) + 16px);
+}
+/* The shared Pagination is styled as a table footer — here it sits on its own under the cards. */
+.devo-pagination > div {
+  border-top: none;
+  padding: 0;
 }
 .devo-group-head {
   display: flex;

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
   createAnnouncement,
@@ -13,7 +13,7 @@ import {
 import { isAdmin, isMis } from "../auth";
 import DevotionBulkUploadModal from "../components/DevotionBulkUploadModal";
 import { Modal, useConfirm, useToast } from "../components/dialogs";
-import { AppShell, Button, DropdownMenu, ProfileMenu, Skeleton, VersePicker } from "../components/ui";
+import { AppShell, Button, DropdownMenu, Pagination, ProfileMenu, Skeleton, VersePicker } from "../components/ui";
 import { StarIcon } from "../components/ui/icons";
 import { KebabIcon, NavDevotionIcon, TopbarSearchIcon } from "../components/ui/shellIcons";
 import { getBibleVersionId } from "../preferences";
@@ -195,6 +195,14 @@ function Devotion() {
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [groupBy, setGroupBy] = useState<GroupKey>("month");
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const listTopRef = useRef<HTMLDivElement>(null);
+
+  // A new search/filter/grouping starts back on page 1 rather than an arbitrary later page.
+  useEffect(() => {
+    setPage(1);
+  }, [query, filter, groupBy]);
 
   const [modal, setModal] = useState<{ mode: "add" | "edit" | "view"; devo: Devo | null } | null>(null);
   const [form, setForm] = useState<DevoForm>(EMPTY_FORM);
@@ -261,19 +269,37 @@ function Devotion() {
     return devos.find((d) => d.id !== modal.devo?.id && isSameDay(d.date, selectedDate)) ?? null;
   }, [devos, form.date, modal]);
 
+  // Paged client-side: the list is only ever this user's own devotions (at most one a day),
+  // so fetching them all stays cheap while search, filters, grouping and the duplicate-date
+  // check keep working across everything — only rendering is limited to one page of cards.
+  const totalPages = Math.max(1, Math.ceil(visible.length / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageItems = useMemo(
+    () => visible.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [visible, currentPage, pageSize],
+  );
+
   const groups = useMemo(() => {
     if (filter === "verse" || groupBy === "none") {
-      return [{ key: "all", label: null as string | null, items: visible }];
+      return [{ key: "all", label: null as string | null, items: pageItems, total: visible.length }];
     }
+    const keyOf = (d: Devo) => (groupBy === "month" ? monthGroupLabel(d.date) : startOfWeek(d.date).toISOString());
+    // A month/week can straddle two pages — its header count still reflects the whole group.
+    const totals = new Map<string, number>();
+    for (const d of visible) totals.set(keyOf(d), (totals.get(keyOf(d)) ?? 0) + 1);
     const map = new Map<string, { label: string; items: Devo[] }>();
-    for (const d of visible) {
-      const label = groupBy === "month" ? monthGroupLabel(d.date) : weekGroupLabel(d.date);
-      const key = groupBy === "month" ? label : startOfWeek(d.date).toISOString();
-      if (!map.has(key)) map.set(key, { label, items: [] });
+    for (const d of pageItems) {
+      const key = keyOf(d);
+      if (!map.has(key)) map.set(key, { label: groupBy === "month" ? monthGroupLabel(d.date) : weekGroupLabel(d.date), items: [] });
       map.get(key)!.items.push(d);
     }
-    return [...map.entries()].map(([key, group]) => ({ key, ...group }));
-  }, [visible, groupBy, filter]);
+    return [...map.entries()].map(([key, group]) => ({ key, ...group, total: totals.get(key) ?? group.items.length }));
+  }, [visible, pageItems, groupBy, filter]);
+
+  const goToPage = (next: number) => {
+    setPage(next);
+    listTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
 
   const openAdd = () => {
     setForm({ ...EMPTY_FORM, date: toDateInputValue(new Date()) });
@@ -542,14 +568,14 @@ function Devotion() {
             {devos.length === 0 ? "No devotions yet." : "No devotions match your search or filter."}
           </p>
         ) : (
-          <div className="devo-groups">
+          <div className="devo-groups" ref={listTopRef}>
             {groups.map((group) => (
               <section key={group.key} aria-label={group.label ?? "Devotions"}>
                 {group.label && (
                   <h2 className="devo-group-head">
                     {group.label}
                     <span className="devo-group-count">
-                      {group.items.length} {group.items.length === 1 ? "devotion" : "devotions"}
+                      {group.total} {group.total === 1 ? "devotion" : "devotions"}
                     </span>
                   </h2>
                 )}
@@ -609,6 +635,19 @@ function Devotion() {
                 </div>
               </section>
             ))}
+            <div className="devo-pagination">
+              <Pagination
+                page={currentPage}
+                pageSize={pageSize}
+                total={visible.length}
+                onPageChange={goToPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setPage(1);
+                }}
+                pageSizeOptions={[10, 20, 50]}
+              />
+            </div>
           </div>
         )}
       </div>

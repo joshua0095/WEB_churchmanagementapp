@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { getDevotionMonthlyReport, monthLabel, weekNumberOfMonth, weeksInMonth, type DevotionReportRow } from "../api";
+import { getDevotionMonthlyReport, monthLabel, type DevotionReportRow } from "../api";
 import { isAdmin, isMis } from "../auth";
 import { AppShell, Card, IconButton, ProfileMenu, Skeleton } from "../components/ui";
 import { BackIcon } from "../components/ui/icons";
@@ -16,14 +16,42 @@ interface ReportRowComputed {
   total: number;
 }
 
-// Counts entries per week rather than just marking presence — a worker can log more than
-// one devotion in the same week, and each one should add to that week's cell.
-function computeRows(rows: DevotionReportRow[], totalWeeks: number): ReportRowComputed[] {
+interface CalendarWeek {
+  startDay: number;
+  endDay: number;
+}
+
+// Devotions are daily, so the report uses real Sunday–Saturday calendar weeks clipped to
+// the month (e.g. Sep 2026: 1–5, 6–12, 13–19, 20–26, 27–30) — never more than 7 days each.
+// Not api.ts's weekNumberOfMonth: that one is for Sunday attendance and folds the days
+// before the month's first Sunday into week 1, which made a daily streak read as 12.
+function calendarWeeksOfMonth(year: number, month: number): CalendarWeek[] {
+  const firstWeekday = new Date(year, month - 1, 1).getDay(); // 0 = Sunday
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const weeks: CalendarWeek[] = [];
+  for (let start = 1; start <= daysInMonth; ) {
+    const end = Math.min(daysInMonth, start + (6 - ((firstWeekday + start - 1) % 7)));
+    weeks.push({ startDay: start, endDay: end });
+    start = end + 1;
+  }
+  return weeks;
+}
+
+function calendarWeekIndex(day: number, year: number, month: number): number {
+  const firstWeekday = new Date(year, month - 1, 1).getDay();
+  return Math.floor((day + firstWeekday - 1) / 7);
+}
+
+// Counts entries per week rather than just marking presence — the count is how many days
+// that week the worker journaled, out of the week's length shown in the column header.
+function computeRows(rows: DevotionReportRow[], year: number, month: number, totalWeeks: number): ReportRowComputed[] {
   return rows.map((row) => {
     const weekCounts = Array(totalWeeks).fill(0);
     for (const date of row.dates) {
-      const w = weekNumberOfMonth(date.slice(0, 10));
-      if (w >= 1 && w <= totalWeeks) weekCounts[w - 1]++;
+      const [y, m, d] = date.slice(0, 10).split("-").map(Number);
+      if (y !== year || m !== month) continue;
+      const w = calendarWeekIndex(d, year, month);
+      if (w >= 0 && w < totalWeeks) weekCounts[w]++;
     }
     const total = weekCounts.reduce((sum, c) => sum + c, 0);
     return { row, weekCounts, total };
@@ -42,7 +70,9 @@ function ReportsDevotions() {
   const [error, setError] = useState<string | null>(null);
 
   const monthValue = useMemo(() => `${year}-${String(month).padStart(2, "0")}`, [year, month]);
-  const totalWeeks = useMemo(() => weeksInMonth(`${monthValue}-01`), [monthValue]);
+  const weeks = useMemo(() => calendarWeeksOfMonth(year, month), [year, month]);
+  const totalWeeks = weeks.length;
+  const shortMonth = new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "short" });
 
   useEffect(() => {
     if (!overseer) return;
@@ -65,7 +95,7 @@ function ReportsDevotions() {
     );
   }
 
-  const computed = rows ? computeRows(rows, totalWeeks) : [];
+  const computed = rows ? computeRows(rows, year, month, totalWeeks) : [];
   const weekTotals = Array.from({ length: totalWeeks }, (_, i) => computed.reduce((sum, c) => sum + c.weekCounts[i], 0));
   const grandTotal = weekTotals.reduce((sum, c) => sum + c, 0);
 
@@ -130,12 +160,16 @@ function ReportsDevotions() {
                   </th>
                 </tr>
                 <tr>
-                  {Array.from({ length: totalWeeks }, (_, i) => (
+                  {weeks.map((week, i) => (
                     <th
                       key={i}
                       className="border-b-2 border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]"
                     >
                       Week {i + 1}
+                      <span className="mt-0.5 block whitespace-nowrap text-[11px] font-semibold normal-case tracking-normal">
+                        {shortMonth} {week.startDay}
+                        {week.endDay !== week.startDay && `–${week.endDay}`}
+                      </span>
                     </th>
                   ))}
                   <th className="border-b-2 border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-center text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
