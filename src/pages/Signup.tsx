@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register } from "../api";
 import { setIsAdmin, setIsMis, setModuleAccess, setToken } from "../auth";
+import { setCachedMe } from "../meCache";
 import { AuthLayout, Button, TextField } from "../components/ui";
 import { successToast } from "../swal";
 
@@ -33,6 +34,7 @@ function Signup() {
       setIsAdmin(auth.isAdmin);
       setIsMis(auth.isMis);
       setModuleAccess(auth.moduleAccess);
+      setCachedMe(null); // fetch this person fresh, never a previous session's cached name/photo
       navigate("/", { replace: true });
       successToast(`Welcome, ${firstName.trim()}!`);
     } catch (err) {

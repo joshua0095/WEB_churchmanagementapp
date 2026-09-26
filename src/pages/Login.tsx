@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../api";
 import { setIsAdmin, setIsMis, setModuleAccess, setToken } from "../auth";
+import { setCachedMe } from "../meCache";
 import { InstallBanner, Spinner, TextField } from "../components/ui";
 import { ErrorIcon, HidePasswordIcon, ShowPasswordIcon } from "../components/ui/icons";
 import loginBg from "../assets/login-bg.jpg";
@@ -28,6 +29,7 @@ function Login() {
       setIsAdmin(auth.isAdmin);
       setIsMis(auth.isMis);
       setModuleAccess(auth.moduleAccess);
+      setCachedMe(null); // fetch this person fresh, never a previous session's cached name/photo
       navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
