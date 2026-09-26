@@ -38,7 +38,7 @@ function byIds<T extends { id: number }>(ids: number[], all: T[]): T[] {
 
 function roleLabel(user: User): string {
   if (user.isAdmin) return "Admin";
-  if (user.isRegistrar) return "Registrar";
+  if (user.isMis) return "MIS";
   return "Member";
 }
 

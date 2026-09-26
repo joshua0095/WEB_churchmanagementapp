@@ -152,14 +152,15 @@ export function LockIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-/** Mobile bottom tab bar's "More" glyph — three stacked lines, distinct from icons.tsx's
- * MoreIcon (a vertical three-dot "row actions" glyph used in tables elsewhere). */
+/** Mobile bottom tab bar's "More" glyph — a 2×2 "apps" grid, so it reads as "more
+ * destinations" rather than icons.tsx's MoreIcon (a three-dot "row actions" glyph). */
 export function MoreNavIcon(props: SVGProps<SVGSVGElement>) {
   return (
     <svg {...base(props)}>
-      <path d="M4 6h16" />
-      <path d="M4 12h16" />
-      <path d="M4 18h16" />
+      <rect x="4" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="4" width="6.5" height="6.5" rx="1.5" />
+      <rect x="4" y="13.5" width="6.5" height="6.5" rx="1.5" />
+      <rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.5" />
     </svg>
   );
 }

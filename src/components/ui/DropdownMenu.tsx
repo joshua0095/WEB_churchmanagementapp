@@ -7,6 +7,12 @@ export interface DropdownMenuItem {
   onSelect: () => void;
   danger?: boolean;
   dividerBefore?: boolean;
+  /** Leading icon shown before the label. */
+  icon?: ReactNode;
+  /** Greys the item out and ignores clicks — e.g. a feature that's not ready yet. */
+  disabled?: boolean;
+  /** Small pill after the label, e.g. "Soon". */
+  badge?: string;
 }
 
 interface DropdownMenuProps {
@@ -95,19 +101,28 @@ function DropdownMenu({ items, ariaLabel, icon, triggerClassName }: DropdownMenu
                 <button
                   type="button"
                   role="menuitem"
+                  disabled={item.disabled}
                   onClick={(e) => {
                     e.stopPropagation();
                     setOpen(false);
                     item.onSelect();
                   }}
                   className={[
-                    "block w-full border-0 bg-transparent px-3.5 py-2 text-left text-sm font-medium transition-colors",
-                    item.danger
-                      ? "text-[var(--color-danger)] hover:bg-red-50"
-                      : "text-[var(--color-text-primary)] hover:bg-black/5",
+                    "flex w-full items-center gap-2 border-0 bg-transparent px-3.5 py-2 text-left text-sm font-medium transition-colors",
+                    item.disabled
+                      ? "cursor-not-allowed text-[var(--color-text-secondary)]"
+                      : item.danger
+                        ? "text-[var(--color-danger)] hover:bg-red-50"
+                        : "text-[var(--color-text-primary)] hover:bg-black/5",
                   ].join(" ")}
                 >
-                  {item.label}
+                  {item.icon && (
+                    <span className="flex shrink-0 [&>svg]:h-4 [&>svg]:w-4" aria-hidden="true">
+                      {item.icon}
+                    </span>
+                  )}
+                  <span className="flex-1">{item.label}</span>
+                  {item.badge && <span className="devo-soon">{item.badge}</span>}
                 </button>
               </div>
             ))}

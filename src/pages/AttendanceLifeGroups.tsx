@@ -11,7 +11,7 @@ import {
   type LifeGroupSummary,
   type User,
 } from "../api";
-import { isAdmin, isRegistrar } from "../auth";
+import { isAdmin, isMis } from "../auth";
 import ChurchWeekPicker from "../components/ChurchWeekPicker";
 import FollowUpModal from "../components/FollowUpModal";
 import LifeGroupMemberList from "../components/LifeGroupMemberList";
@@ -29,6 +29,7 @@ import {
   TextField,
 } from "../components/ui";
 import { BackIcon } from "../components/ui/icons";
+import { TopbarSearchIcon } from "../components/ui/shellIcons";
 import { useLifeGroupSessions } from "../hooks/useLifeGroupSessions";
 import { successToast } from "../swal";
 
@@ -42,7 +43,7 @@ function todayIso(): string {
 
 function AttendanceLifeGroups() {
   const navigate = useNavigate();
-  const overseer = isAdmin() || isRegistrar();
+  const overseer = isAdmin() || isMis();
 
   const [groups, setGroups] = useState<LifeGroupSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,6 +69,7 @@ function AttendanceLifeGroups() {
   const [newMemberIsFirstTimer, setNewMemberIsFirstTimer] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [followUpGroupId, setFollowUpGroupId] = useState<number | null>(null);
+  const [search, setSearch] = useState("");
 
   // `silent` skips the loading skeleton for a background refresh (e.g. after adding a
   // member) — otherwise every expanded Accordion would unmount/remount and collapse.
@@ -83,7 +85,7 @@ function AttendanceLifeGroups() {
     }
   };
 
-  // This screen lists and manages every life group system-wide — Admin/Registrar only.
+  // This screen lists and manages every life group system-wide — Admin/MIS only.
   // A leader who isn't an overseer has their own single/multi-group flow already on the
   // Attendance hub (which lands them straight on their group's management page when they
   // lead only one), so send anyone else back there instead of exposing every group here.
@@ -97,6 +99,13 @@ function AttendanceLifeGroups() {
   }, [overseer]);
 
   if (!overseer) return null;
+
+  const query = search.trim().toLowerCase();
+  const visibleGroups = query
+    ? groups.filter((g) =>
+        [g.groupName, g.leaderName, g.networkName ?? ""].some((field) => field.toLowerCase().includes(query)),
+      )
+    : groups;
 
   const openAddGroup = async () => {
     setAddGroupOpen(true);
@@ -177,7 +186,20 @@ function AttendanceLifeGroups() {
         <p className="helper-text">No life groups yet. Add one to get started.</p>
       ) : (
         <div className="flex flex-col gap-3">
-          {groups.map((group) => {
+          {groups.length > 1 && (
+            <label className="devo-search mb-1">
+              <TopbarSearchIcon />
+              <input
+                type="search"
+                placeholder="Search by group, leader, or network"
+                aria-label="Search life groups"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+              />
+            </label>
+          )}
+          {visibleGroups.length === 0 && <p className="helper-text">No life groups match your search.</p>}
+          {visibleGroups.map((group) => {
             const session = sessions[group.id];
             return (
               <Accordion

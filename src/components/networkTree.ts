@@ -43,7 +43,16 @@ export function getAncestorNetworkIds(networkId: number, networks: Network[]): n
 /** Short display code for a network name, e.g. "Church Development Network" → "CDN" — a
  * client-side derivation for tile/badge display, not a value the backend stores. */
 export function abbreviateNetworkName(name: string): string {
-  const words = name.split(/\s+/).filter(Boolean);
+  // Names like "Church Development Network (CDN)" already carry their code — use it as-is.
+  const code = name.match(/\(([^)]+)\)\s*$/)?.[1].trim();
+  if (code) return code.toUpperCase().slice(0, 4);
+
+  // Otherwise initial each word, ignoring punctuation so "(" or "&" never becomes a letter.
+  const words = name
+    .split(/\s+/)
+    .map((w) => w.replace(/[^\p{L}\p{N}]/gu, ""))
+    .filter(Boolean);
+  if (words.length === 0) return "";
   if (words.length === 1) return words[0].slice(0, 3).toUpperCase();
   return words
     .map((w) => w[0])

@@ -9,7 +9,7 @@ import {
   type CongregationBreakdownRow,
   type RetentionReport,
 } from "../api";
-import { isAdmin, isRegistrar } from "../auth";
+import { isAdmin, isMis } from "../auth";
 import { AppShell, Card, FilterBar, IconButton, ProfileMenu, SelectField, Skeleton, TextField } from "../components/ui";
 import { BackIcon } from "../components/ui/icons";
 
@@ -96,7 +96,7 @@ function todayIso(): string {
 
 function ReportsCongregation() {
   const navigate = useNavigate();
-  const overseer = isAdmin() || isRegistrar();
+  const overseer = isAdmin() || isMis();
 
   const [events, setEvents] = useState<AttendanceEvent[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);

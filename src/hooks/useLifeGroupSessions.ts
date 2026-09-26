@@ -28,7 +28,7 @@ function todayIso(): string {
 
 /**
  * Loads and tracks each Life Group's currently-open attendance session, keyed by group id —
- * shared between the Admin/Registrar all-groups view and a leader's own-groups view, since
+ * shared between the Admin/MIS all-groups view and a leader's own-groups view, since
  * both open sessions and check members in/out the same way.
  */
 export function useLifeGroupSessions() {

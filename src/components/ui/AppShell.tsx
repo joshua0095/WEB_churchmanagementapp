@@ -71,7 +71,7 @@ const MOBILE_TABS: (NavItem & { mobileLabel?: string })[] = [
   { label: "Home", icon: <NavHomeIcon />, to: "/" },
   { label: "Devotion", icon: <NavDevotionIcon />, to: "/devotion" },
   { label: "Attendance", icon: <NavAttendanceIcon />, to: "/attendance", module: "Attendance" },
-  { label: "Announcements", mobileLabel: "News", icon: <NavAnnouncementsIcon />, to: "/announcements", module: "Announcements" },
+  { label: "Reports", icon: <NavReportsIcon />, to: "/reports", module: "Reports" },
 ];
 
 const BREADCRUMBS: Record<string, { section: string; title: string }> = {
@@ -114,6 +114,8 @@ function AppShell({ children, headerRight, pageClassName }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
   const [manualExpanded, setManualExpanded] = useState<Record<string, boolean>>({});
   const [moreOpen, setMoreOpen] = useState(false);
+  // Keeps the sheet mounted while its slide-down exit animation plays; it unmounts on animationend.
+  const [moreClosing, setMoreClosing] = useState(false);
   const me = useMe();
   const navigate = useNavigate();
   const location = useLocation();
@@ -121,7 +123,7 @@ function AppShell({ children, headerRight, pageClassName }: AppShellProps) {
   useEffect(() => {
     if (!moreOpen) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMoreOpen(false);
+      if (e.key === "Escape") setMoreClosing(true);
     };
     document.addEventListener("keydown", onKeyDown);
     const previousOverflow = document.body.style.overflow;
@@ -342,20 +344,44 @@ function AppShell({ children, headerRight, pageClassName }: AppShellProps) {
               </button>
             );
           })}
-          <button type="button" className="app-bottom-tab" aria-haspopup="dialog" aria-expanded={moreOpen} onClick={() => setMoreOpen(true)}>
-            <span className="app-bottom-tab-icon">
+          <button
+            type="button"
+            className="app-bottom-tab app-bottom-tab--more"
+            aria-haspopup="dialog"
+            aria-expanded={moreOpen && !moreClosing}
+            aria-label={`More (${moreItems.length + 1} more pages)`}
+            onClick={() => {
+              setMoreClosing(false);
+              setMoreOpen(true);
+            }}
+          >
+            <span className="app-bottom-tab-icon app-bottom-tab-icon--more">
               <MoreNavIcon />
+              {/* +1 for My Profile, which the sheet always lists. */}
+              <span className="app-bottom-tab-badge" aria-hidden="true">
+                {moreItems.length + 1}
+              </span>
             </span>
-            <span className="app-bottom-tab-label">More</span>
+            <span className="app-bottom-tab-label app-bottom-tab-label--more">More</span>
           </button>
         </nav>
       </div>
 
       {/* Mobile "More" sheet */}
       {moreOpen && (
-        <div className="app-more-sheet-root">
-          <div className="app-more-sheet-backdrop" onClick={() => setMoreOpen(false)} aria-hidden="true" />
-          <div role="dialog" aria-modal="true" aria-label="More" className="app-more-sheet">
+        <div className={`app-more-sheet-root${moreClosing ? " is-closing" : ""}`}>
+          <div className="app-more-sheet-backdrop" onClick={() => setMoreClosing(true)} aria-hidden="true" />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="More"
+            className="app-more-sheet"
+            onAnimationEnd={(e) => {
+              if (e.target !== e.currentTarget || !moreClosing) return;
+              setMoreOpen(false);
+              setMoreClosing(false);
+            }}
+          >
             <div className="app-more-sheet-handle" aria-hidden="true" />
             {moreItems.map((item) => (
               <button key={item.label} type="button" className="app-more-sheet-item" onClick={() => goToItem(item)}>

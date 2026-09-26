@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { register } from "../api";
-import { setIsAdmin, setIsRegistrar, setModuleAccess, setToken } from "../auth";
+import { setIsAdmin, setIsMis, setModuleAccess, setToken } from "../auth";
 import { AuthLayout, Button, TextField } from "../components/ui";
 import { successToast } from "../swal";
 
@@ -31,7 +31,7 @@ function Signup() {
       });
       setToken(auth.token);
       setIsAdmin(auth.isAdmin);
-      setIsRegistrar(auth.isRegistrar);
+      setIsMis(auth.isMis);
       setModuleAccess(auth.moduleAccess);
       navigate("/", { replace: true });
       successToast(`Welcome, ${firstName.trim()}!`);

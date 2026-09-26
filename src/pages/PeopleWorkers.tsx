@@ -8,7 +8,6 @@ import {
   getUsers,
   resetUserPassword,
   setUserActive,
-  setUserRegistrar,
   updateUser,
   type Ministry,
   type Network,
@@ -51,7 +50,6 @@ const emptyUserForm = {
   photoDataUrl: null as string | null,
   ministryIds: [] as number[],
   networkIds: [] as number[],
-  isRegistrar: false,
 };
 
 interface NetworkPickerNodeProps {
@@ -306,7 +304,6 @@ function PeopleWorkers() {
       photoDataUrl: u.photoDataUrl,
       ministryIds: u.ministryIds,
       networkIds: u.networkIds,
-      isRegistrar: u.isRegistrar,
     });
     setUserFormError(null);
     setUserModalOpen(true);
@@ -372,7 +369,6 @@ function PeopleWorkers() {
 
       if (editingUserId === null) {
         const result = await createUser(payload);
-        await setUserRegistrar(result.user.id, userForm.isRegistrar);
         setUserModalOpen(false);
         await loadUsers(true);
         await infoAlert(
@@ -381,7 +377,6 @@ function PeopleWorkers() {
         );
       } else {
         await updateUser(editingUserId, payload);
-        await setUserRegistrar(editingUserId, userForm.isRegistrar);
         setUserModalOpen(false);
         setBusyUserId(editingUserId);
         await loadUsers(true);
@@ -705,15 +700,6 @@ function PeopleWorkers() {
             value={userForm.birthday}
             onChange={(e) => setUserForm((f) => ({ ...f, birthday: e.target.value }))}
           />
-
-          <label className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
-            <input
-              type="checkbox"
-              checked={userForm.isRegistrar}
-              onChange={(e) => setUserForm((f) => ({ ...f, isRegistrar: e.target.checked }))}
-            />
-            Registrar (can manage attendance)
-          </label>
 
           <div>
             <p className="section-title">Networks &amp; ministries</p>

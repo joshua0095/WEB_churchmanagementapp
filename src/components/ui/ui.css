@@ -689,6 +689,52 @@
   font-weight: 700;
   color: var(--color-text-primary);
 }
+/* "More" tab — set apart from the regular tabs so it reads as a launcher for extra pages. */
+.app-bottom-tab--more::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 22%;
+  bottom: 22%;
+  border-left: 1px solid var(--color-border);
+}
+.app-bottom-tab-icon--more {
+  position: relative;
+  background: rgba(217, 163, 42, 0.16);
+  box-shadow: inset 0 0 0 1px rgba(217, 163, 42, 0.45);
+  color: #9a6f10;
+  transition: background-color 0.2s, color 0.2s;
+}
+.app-bottom-tab-icon--more svg {
+  width: 20px;
+  height: 20px;
+}
+.app-bottom-tab--more[aria-expanded="true"] .app-bottom-tab-icon--more {
+  background: var(--color-navy);
+  box-shadow: none;
+  color: var(--color-gold);
+}
+.app-bottom-tab-badge {
+  position: absolute;
+  top: -5px;
+  right: -3px;
+  min-width: 17px;
+  height: 17px;
+  padding: 0 4px;
+  border-radius: 999px;
+  border: 2px solid var(--color-surface);
+  background: var(--color-navy);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 13px;
+  text-align: center;
+  box-sizing: border-box;
+}
+.app-bottom-tab-label--more {
+  font-weight: 600;
+  color: #9a6f10;
+}
 @media (min-width: 1024px) {
   .app-bottom-nav {
     display: none;
@@ -759,6 +805,64 @@
 .app-more-sheet-divider {
   margin: 0.3rem 0.6rem;
   border-top: 1px solid var(--color-border);
+}
+
+@keyframes app-more-backdrop-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes app-more-backdrop-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes app-more-sheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes app-more-sheet-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes app-more-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.app-more-sheet-backdrop {
+  animation: app-more-backdrop-in 0.25s ease-out;
+}
+.app-more-sheet {
+  animation: app-more-sheet-in 0.32s cubic-bezier(0.32, 0.72, 0, 1);
+}
+.app-more-sheet > .app-more-sheet-item {
+  animation: app-more-item-in 0.3s ease-out backwards;
+}
+.app-more-sheet > .app-more-sheet-item:nth-child(2) { animation-delay: 60ms; }
+.app-more-sheet > .app-more-sheet-item:nth-child(3) { animation-delay: 90ms; }
+.app-more-sheet > .app-more-sheet-item:nth-child(4) { animation-delay: 120ms; }
+.app-more-sheet > .app-more-sheet-item:nth-child(5) { animation-delay: 150ms; }
+.app-more-sheet > .app-more-sheet-item:nth-child(n + 6) { animation-delay: 180ms; }
+.app-more-sheet-root.is-closing .app-more-sheet-backdrop {
+  animation: app-more-backdrop-out 0.22s ease-in forwards;
+}
+.app-more-sheet-root.is-closing .app-more-sheet {
+  animation: app-more-sheet-out 0.22s cubic-bezier(0.4, 0, 1, 1) forwards;
+}
+.app-more-sheet-root.is-closing {
+  pointer-events: none;
+}
+@media (prefers-reduced-motion: reduce) {
+  /* Near-zero rather than `none` so animationend still fires and the sheet unmounts on close. */
+  .app-more-sheet-root *,
+  .app-more-sheet {
+    animation-duration: 1ms !important;
+    animation-delay: 0ms !important;
+  }
 }
 
 @media (min-width: 1024px) {
@@ -1496,6 +1600,19 @@
 }
 .devo-write-btn:hover {
   background: var(--color-gold-hover);
+}
+.devo-header-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 8px;
+}
+/* Admin/MIS-only secondary action beside "Write devotion" — outlined so the gold button stays primary. */
+.devo-bulk-btn {
+  background: transparent;
+  box-shadow: inset 0 0 0 1px rgba(18, 32, 61, 0.2);
+}
+.devo-bulk-btn:hover {
+  background: rgba(18, 32, 61, 0.05);
 }
 .devo-write-long {
   display: none;

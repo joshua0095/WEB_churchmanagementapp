@@ -7,7 +7,7 @@ import {
   type CongregationMember,
   type Gender,
 } from "../api";
-import { isAdmin, isRegistrar } from "../auth";
+import { isAdmin, isMis } from "../auth";
 import { InitialAvatar, formatBirthday } from "../components/PeopleShared";
 import {
   AppShell,
@@ -63,7 +63,7 @@ function PeopleCongregation() {
   const [loadingCongregation, setLoadingCongregation] = useState(true);
   const [congregationError, setCongregationError] = useState<string | null>(null);
 
-  const canManageCongregation = isAdmin() || isRegistrar();
+  const canManageCongregation = isAdmin() || isMis();
 
   const [congregantModalOpen, setCongregantModalOpen] = useState(false);
   const [editingCongregantId, setEditingCongregantId] = useState<number | null>(null);

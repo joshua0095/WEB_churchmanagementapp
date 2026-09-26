@@ -12,7 +12,7 @@ export interface User {
   nickname: string | null;
   email: string;
   isAdmin: boolean;
-  isRegistrar: boolean;
+  isMis: boolean;
   isActive: boolean;
   birthday: string | null;
   /** A compressed image as a data URL — see compressImageToDataUrl in utils/imageCompression. */
@@ -39,7 +39,7 @@ export interface AuthResponse {
   name: string;
   email: string;
   isAdmin: boolean;
-  isRegistrar: boolean;
+  isMis: boolean;
   moduleAccess: Record<string, boolean>;
 }
 
@@ -244,17 +244,6 @@ export async function updateUser(id: number | string, user: UserFormRequest): Pr
   return res.json();
 }
 
-export async function setUserRegistrar(id: number | string, isRegistrar: boolean): Promise<User> {
-  const res = await apiFetch(`/api/users/${id}/registrar`, {
-    method: "PUT",
-    body: JSON.stringify({ isRegistrar }),
-  });
-  if (!res.ok) {
-    throw new Error(`Failed to update registrar status (${res.status})`);
-  }
-  return res.json();
-}
-
 export async function setUserActive(id: number | string, isActive: boolean): Promise<User> {
   const res = await apiFetch(`/api/users/${id}/active`, {
     method: "PUT",
@@ -288,6 +277,8 @@ export interface Network {
   name: string;
   /** Null for a top-level (macro) network; otherwise the id of the macro network this sub-network belongs under. */
   parentNetworkId: number | null;
+  /** Set only on networks the app itself depends on — "MIS" grants the MIS role. Renamable, not deletable. */
+  systemKey: string | null;
 }
 
 export interface Ministry {
@@ -546,6 +537,81 @@ export async function updateDevotion(id: number, devotion: DevotionRequest): Pro
   });
   if (!res.ok) {
     throw new Error((await res.text()) || `Failed to update devotion (${res.status})`);
+  }
+  return res.json();
+}
+
+export interface BulkDevotionRow {
+  /** Where this devotion starts in the uploaded file — echoed back in errors. */
+  line: number;
+  /** YYYY-MM-DD */
+  date: string;
+  verse: string;
+  scripture: string;
+  observation: string;
+  application: string;
+  prayer: string;
+  notes: string | null;
+}
+
+export interface BulkDevotionError {
+  line: number;
+  message: string;
+  /** "duplicate": the worker already has a devotion that date (skippable via skipDuplicates). */
+  kind: "invalid" | "duplicate";
+}
+
+export interface BulkDevotionResult {
+  imported: number;
+  /** Rows left out because their date was a duplicate (only when skipDuplicates was set). */
+  skipped: number;
+}
+
+/** Thrown when the API rejects a bulk upload row by row (nothing was saved). */
+export class BulkDevotionUploadError extends Error {
+  readonly rowErrors: BulkDevotionError[];
+
+  constructor(rowErrors: BulkDevotionError[]) {
+    super(`${rowErrors.length} devotion${rowErrors.length === 1 ? "" : "s"} couldn't be imported.`);
+    this.rowErrors = rowErrors;
+  }
+}
+
+/** Admin/MIS only. All-or-nothing: resolves with the count saved, or throws — nothing is saved on any error. */
+export interface BulkWorkerOption {
+  id: number;
+  name: string;
+  email: string;
+}
+
+/** Admin/MIS only — active workers for the bulk upload's worker picker. */
+export async function getBulkDevotionWorkers(): Promise<BulkWorkerOption[]> {
+  const res = await apiFetch("/api/devotions/bulk/workers");
+  if (!res.ok) {
+    throw new Error(`Failed to load workers (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function bulkCreateDevotions(
+  userId: number,
+  rows: BulkDevotionRow[],
+  skipDuplicates = false,
+): Promise<BulkDevotionResult> {
+  const res = await apiFetch("/api/devotions/bulk", {
+    method: "POST",
+    body: JSON.stringify({ userId, rows, skipDuplicates }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    let rowErrors: BulkDevotionError[] | undefined;
+    try {
+      rowErrors = (JSON.parse(text) as { errors?: BulkDevotionError[] }).errors;
+    } catch {
+      // Plain-text message (e.g. "Upload at most 500 devotions at a time.")
+    }
+    if (Array.isArray(rowErrors)) throw new BulkDevotionUploadError(rowErrors);
+    throw new Error(text || `Failed to upload devotions (${res.status})`);
   }
   return res.json();
 }

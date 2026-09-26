@@ -1,6 +1,8 @@
 const TOKEN_KEY = "authToken";
 const IS_ADMIN_KEY = "authIsAdmin";
-const IS_REGISTRAR_KEY = "authIsRegistrar";
+const IS_MIS_KEY = "authIsMis";
+// Pre-MIS builds cached the (now removed) Registrar flag here — only ever cleared, never read.
+const LEGACY_IS_REGISTRAR_KEY = "authIsRegistrar";
 const MODULE_ACCESS_KEY = "authModuleAccess";
 
 export function getToken(): string | null {
@@ -19,12 +21,13 @@ export function isAdmin(): boolean {
   return localStorage.getItem(IS_ADMIN_KEY) === "true";
 }
 
-export function setIsRegistrar(isRegistrar: boolean): void {
-  localStorage.setItem(IS_REGISTRAR_KEY, String(isRegistrar));
+/** Member of the Management Information System network — the overseer role alongside Admin. */
+export function setIsMis(isMis: boolean): void {
+  localStorage.setItem(IS_MIS_KEY, String(isMis));
 }
 
-export function isRegistrar(): boolean {
-  return localStorage.getItem(IS_REGISTRAR_KEY) === "true";
+export function isMis(): boolean {
+  return localStorage.getItem(IS_MIS_KEY) === "true";
 }
 
 export function setModuleAccess(moduleAccess: Record<string, boolean>): void {
@@ -46,7 +49,8 @@ export function canAccessModule(module: string): boolean {
 export function clearToken(): void {
   localStorage.removeItem(TOKEN_KEY);
   localStorage.removeItem(IS_ADMIN_KEY);
-  localStorage.removeItem(IS_REGISTRAR_KEY);
+  localStorage.removeItem(IS_MIS_KEY);
+  localStorage.removeItem(LEGACY_IS_REGISTRAR_KEY);
   localStorage.removeItem(MODULE_ACCESS_KEY);
 }
 
@@ -54,11 +58,11 @@ export function isAuthenticated(): boolean {
   return getToken() !== null;
 }
 
-/** Same precedence as the badge shown on the My Profile page (Admin > Registrar > Member),
+/** Same precedence as the badge shown on the My Profile page (Admin > MIS > Member),
  * but derived from the login-time flags cached here rather than a fresh User fetch — for
  * places like the sidebar user card that only need a role label, not the full profile. */
 export function getRoleLabel(): string {
   if (isAdmin()) return "Admin";
-  if (isRegistrar()) return "Registrar";
+  if (isMis()) return "MIS";
   return "Member";
 }

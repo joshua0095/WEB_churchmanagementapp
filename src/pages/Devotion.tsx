@@ -10,6 +10,8 @@ import {
   type Devotion as ApiDevotion,
   type DevotionRequest,
 } from "../api";
+import { isAdmin, isMis } from "../auth";
+import DevotionBulkUploadModal from "../components/DevotionBulkUploadModal";
 import { Modal, useConfirm, useToast } from "../components/dialogs";
 import { AppShell, Button, DropdownMenu, ProfileMenu, Skeleton, VersePicker } from "../components/ui";
 import { StarIcon } from "../components/ui/icons";
@@ -200,6 +202,8 @@ function Devotion() {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [versionLabel, setVersionLabel] = useState<string | null>(null);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const canBulkUpload = isAdmin() || isMis();
 
   const loadDevotions = async () => {
     setLoading(true);
@@ -453,14 +457,31 @@ function Devotion() {
             <h1 className="devo-title">Devotions</h1>
             <p className="devo-subtitle">Your SOAP journal: Scripture, Observation, Application, Prayer.</p>
           </div>
-          <button type="button" className="devo-write-btn" onClick={openAdd} aria-label="Write devotion">
-            <span className="devo-write-long" aria-hidden="true">
-              + Write devotion
-            </span>
-            <span className="devo-write-short" aria-hidden="true">
-              + Write
-            </span>
-          </button>
+          <div className="devo-header-actions">
+            {canBulkUpload && (
+              <button
+                type="button"
+                className="devo-write-btn devo-bulk-btn"
+                onClick={() => setBulkOpen(true)}
+                aria-label="Bulk upload devotions"
+              >
+                <span className="devo-write-long" aria-hidden="true">
+                  Bulk upload
+                </span>
+                <span className="devo-write-short" aria-hidden="true">
+                  Upload
+                </span>
+              </button>
+            )}
+            <button type="button" className="devo-write-btn" onClick={openAdd} aria-label="Write devotion">
+              <span className="devo-write-long" aria-hidden="true">
+                + Write devotion
+              </span>
+              <span className="devo-write-short" aria-hidden="true">
+                + Write
+              </span>
+            </button>
+          </div>
         </div>
 
         <div className="devo-toolbar">
@@ -563,21 +584,19 @@ function Devotion() {
                         )}
                       </div>
                       <div className="devo-card-actions" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          type="button"
-                          className="devo-icon-btn"
-                          disabled
-                          aria-label="Favorite (coming soon)"
-                          title="Favorites are coming soon"
-                        >
-                          <StarIcon />
-                        </button>
                         <DropdownMenu
                           icon={<KebabIcon />}
                           triggerClassName="devo-icon-btn"
                           ariaLabel={`Actions for ${devo.verse}`}
                           items={[
-                            { label: "Edit", onSelect: () => openEdit(devo) },
+                            {
+                              label: "Add to favorites",
+                              icon: <StarIcon />,
+                              onSelect: () => {},
+                              disabled: true,
+                              badge: "Soon",
+                            },
+                            { label: "Edit", onSelect: () => openEdit(devo), dividerBefore: true },
                             { label: "View full devotion", onSelect: () => openView(devo) },
                             { label: "Duplicate", onSelect: () => handleDuplicate(devo) },
                             { label: "Share to announcements", onSelect: () => handleShare(devo) },
@@ -766,6 +785,10 @@ function Devotion() {
           </div>
         )}
       </Modal>
+
+      {canBulkUpload && (
+        <DevotionBulkUploadModal open={bulkOpen} onClose={() => setBulkOpen(false)} onImported={loadDevotions} />
+      )}
     </AppShell>
   );
 }

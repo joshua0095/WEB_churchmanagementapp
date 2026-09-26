@@ -33,12 +33,20 @@ function TreeBranch({ node, depth, onEditNetwork, onDeleteNetwork, onEditMinistr
       <div className="tree-node tree-node--subnet" style={{ marginLeft: depth * 20 }}>
         <span className="tree-node-name">{node.network.name}</span>
         <span className="tree-chip tree-chip--sub">Sub-network</span>
+        {node.network.systemKey === "MIS" && (
+          <span className="tree-chip tree-chip--sub" title="Members of this network get the MIS role">
+            Grants MIS role
+          </span>
+        )}
         <DropdownMenu
           {...KEBAB_PROPS}
           ariaLabel={`Actions for ${node.network.name}`}
           items={[
             { label: "Edit", onSelect: () => onEditNetwork(node.network) },
-            { label: "Delete", onSelect: () => onDeleteNetwork(node.network), danger: true, dividerBefore: true },
+            // Built-in networks (e.g. MIS) can be renamed but not deleted — the API refuses it too.
+            ...(node.network.systemKey
+              ? []
+              : [{ label: "Delete", onSelect: () => onDeleteNetwork(node.network), danger: true, dividerBefore: true }]),
           ]}
         />
       </div>

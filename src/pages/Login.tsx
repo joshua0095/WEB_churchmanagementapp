@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { login } from "../api";
-import { setIsAdmin, setIsRegistrar, setModuleAccess, setToken } from "../auth";
+import { setIsAdmin, setIsMis, setModuleAccess, setToken } from "../auth";
 import { InstallBanner, Spinner, TextField } from "../components/ui";
 import { ErrorIcon, HidePasswordIcon, ShowPasswordIcon } from "../components/ui/icons";
 import loginBg from "../assets/login-bg.jpg";
@@ -26,7 +26,7 @@ function Login() {
       const auth = await login(email, password);
       setToken(auth.token);
       setIsAdmin(auth.isAdmin);
-      setIsRegistrar(auth.isRegistrar);
+      setIsMis(auth.isMis);
       setModuleAccess(auth.moduleAccess);
       navigate("/", { replace: true });
     } catch (err) {

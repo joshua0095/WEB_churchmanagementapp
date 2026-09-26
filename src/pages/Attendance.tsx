@@ -13,7 +13,7 @@ import {
   type AttendanceTrackingType,
   type LifeGroup,
 } from "../api";
-import { isAdmin, isRegistrar } from "../auth";
+import { isAdmin, isMis } from "../auth";
 import ChurchWeekPicker from "../components/ChurchWeekPicker";
 import FollowUpModal from "../components/FollowUpModal";
 import LifeGroupMemberList from "../components/LifeGroupMemberList";
@@ -30,6 +30,7 @@ import {
   TextField,
 } from "../components/ui";
 import { AttendanceIcon, BackIcon, HeadcountIcon, LifeGroupIcon, UserListIcon } from "../components/ui/icons";
+import { TopbarSearchIcon } from "../components/ui/shellIcons";
 import { useLifeGroupSessions } from "../hooks/useLifeGroupSessions";
 import { successToast } from "../swal";
 
@@ -73,7 +74,7 @@ type Step = "event" | "date" | "type" | "lifegroups";
 
 function Attendance() {
   const navigate = useNavigate();
-  const overseer = isAdmin() || isRegistrar();
+  const overseer = isAdmin() || isMis();
 
   const [checkingAccess, setCheckingAccess] = useState(!overseer);
   const [accessError, setAccessError] = useState<string | null>(null);
@@ -94,6 +95,7 @@ function Attendance() {
   const [newMemberIsFirstTimer, setNewMemberIsFirstTimer] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [followUpGroupId, setFollowUpGroupId] = useState<number | null>(null);
+  const [groupSearch, setGroupSearch] = useState("");
 
   const [events, setEvents] = useState<AttendanceEvent[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(true);
@@ -108,7 +110,7 @@ function Attendance() {
   const [congregationProgress, setCongregationProgress] = useState<Progress | null>(null);
   const [loadingProgress, setLoadingProgress] = useState(false);
 
-  // Life Group leaders (not Admin/Registrar) skip this hub entirely — they only
+  // Life Group leaders (not Admin/MIS) skip this hub entirely — they only
   // ever manage their own group(s), never Bible Reading / WHS / Worker's Empowerment.
   useEffect(() => {
     if (overseer) return;
@@ -207,6 +209,10 @@ function Attendance() {
   }
 
   const singleGroup = myGroups.length === 1;
+  const groupQuery = groupSearch.trim().toLowerCase();
+  const visibleGroups = groupQuery
+    ? myGroups.filter((g) => g.groupName.toLowerCase().includes(groupQuery))
+    : myGroups;
 
   const handleAddMember = async () => {
     if (addMemberGroupId === null || !newMemberName.trim()) return;
@@ -270,7 +276,7 @@ function Attendance() {
                   </button>
                 ))}
               {/* A non-overseer only ever has access to their own Life Group(s) — Bible
-                  Reading / WHS / Worker's Empowerment / Headcount are Admin/Registrar-only
+                  Reading / WHS / Worker's Empowerment / Headcount are Admin/MIS-only
                   at the API level, so there's nothing else to show them here. */}
               {(overseer || myGroups.length > 0) && (
                 <button
@@ -305,8 +311,23 @@ function Attendance() {
 
           {sessionError && <p className="error mb-4">{sessionError}</p>}
 
+          {!singleGroup && (
+            <label className="devo-search mb-4">
+              <TopbarSearchIcon />
+              <input
+                type="search"
+                placeholder="Search your life groups"
+                aria-label="Search life groups"
+                value={groupSearch}
+                onChange={(e) => setGroupSearch(e.target.value)}
+              />
+            </label>
+          )}
+
+          {visibleGroups.length === 0 && <p className="helper-text">No life groups match your search.</p>}
+
           <div className="flex flex-col gap-3">
-            {myGroups.map((group) => {
+            {visibleGroups.map((group) => {
               const session = sessions[group.id];
               return (
                 <Accordion

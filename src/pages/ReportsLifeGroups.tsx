@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getLifeGroupMonthlyReport, weekNumberOfMonth, weeksInMonth, type LifeGroupReportRow } from "../api";
-import { isAdmin, isRegistrar } from "../auth";
+import { isAdmin, isMis } from "../auth";
 import { AppShell, Card, IconButton, ProfileMenu, Skeleton } from "../components/ui";
 import { BackIcon } from "../components/ui/icons";
 
@@ -59,7 +59,7 @@ function networkSortIndex(networkName: string | null): number {
 
 function ReportsLifeGroups() {
   const navigate = useNavigate();
-  const overseer = isAdmin() || isRegistrar();
+  const overseer = isAdmin() || isMis();
 
   const { year: defaultYear, month: defaultMonth } = currentYearMonth();
   const [year, setYear] = useState(defaultYear);

@@ -1,11 +1,11 @@
 import { useNavigate } from "react-router-dom";
-import { isAdmin, isRegistrar } from "../auth";
+import { isAdmin, isMis } from "../auth";
 import { AppShell, Card, ProfileMenu } from "../components/ui";
 import { DevotionIcon, LifeGroupIcon, ReportsIcon } from "../components/ui/icons";
 
 function Reports() {
   const navigate = useNavigate();
-  const overseer = isAdmin() || isRegistrar();
+  const overseer = isAdmin() || isMis();
 
   if (!overseer) {
     return (
