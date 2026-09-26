@@ -26,6 +26,56 @@ function timeOfDayGreeting(): string {
   return "Good evening";
 }
 
+// Short blessings under the greeting, carried over from the first Home design. One is
+// picked at random each time Home opens (held for the visit, so re-renders don't swap it).
+const BLESSINGS = [
+  "The Lord bless you and keep you today.",
+  "Grace and peace to you this day.",
+  "Walking in His presence today.",
+  "May His joy be your strength today.",
+  "Rejoice in the Lord always.",
+  "His mercies are new this morning.",
+  "Come, let us worship together today.",
+  "Be still and know that He is God.",
+  "The Lord is your shepherd today.",
+  "His faithfulness endures forever.",
+  "Cast your cares on Him today, for He cares for you.",
+  "Trust in the Lord with all your heart today.",
+  "The joy of the Lord is your strength.",
+  "May His peace guard your heart today.",
+  "Give thanks to the Lord, for He is good.",
+  "Delight yourself in the Lord today.",
+  "His grace is sufficient for you today.",
+  "Let your light shine before others today.",
+  "The Lord is near to the brokenhearted.",
+  "Walk by faith, not by sight, today.",
+  "His steadfast love never ceases.",
+  "The Lord is your light and your salvation.",
+  "He makes all things work together for good.",
+  "Seek first His kingdom today.",
+  "Nothing is impossible with God.",
+  "The Lord fights for you; be still.",
+  "His word is a lamp for your feet today.",
+  "Be strong and courageous today.",
+  "The Lord's hand is not too short to save.",
+  "In His presence there is fullness of joy.",
+  "He is able to do immeasurably more than you ask.",
+  "The Lord is good to those who wait for Him.",
+  "Great is His faithfulness this morning.",
+  "Let everything you do be done in love.",
+  "The name of the Lord is a strong tower.",
+  "He restores your soul today.",
+  "Wait on the Lord; be of good courage.",
+  "His banner over you is love.",
+  "The Lord will perfect what concerns you today.",
+  "You are fearfully and wonderfully made.",
+  "His plans for you are good, to give you hope.",
+];
+
+function randomBlessing(): string {
+  return BLESSINGS[Math.floor(Math.random() * BLESSINGS.length)];
+}
+
 /** "Saturday, 26 September" */
 function formatBannerDate(d: Date): string {
   const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
@@ -93,6 +143,7 @@ function Home() {
   const theme = monthlyTheme && monthlyTheme.title.trim() ? monthlyTheme : null;
 
   const [firstName, setFirstName] = useState("");
+  const [blessing] = useState(randomBlessing);
   const [verse, setVerse] = useState<VerseOfTheDay | null>(null);
   const [verseError, setVerseError] = useState<string | null>(null);
   const [verseLoading, setVerseLoading] = useState(true);
@@ -167,7 +218,7 @@ function Home() {
               {timeOfDayGreeting()}
               {firstName ? `, ${firstName}` : ""}.
               <br />
-              <span className="home-hero-title-sub">God bless your day.</span>
+              <span className="home-hero-title-sub">{blessing}</span>
             </h1>
             {verseLoading ? (
               <div className="home-verse" aria-hidden="true">

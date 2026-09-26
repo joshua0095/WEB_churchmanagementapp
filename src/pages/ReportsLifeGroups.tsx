@@ -2,7 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { getLifeGroupMonthlyReport, weekNumberOfMonth, weeksInMonth, type LifeGroupReportRow } from "../api";
 import { isAdmin, isMis } from "../auth";
-import { AppShell, Card, IconButton, ProfileMenu, Skeleton } from "../components/ui";
+import { AppShell, Button, Card, IconButton, ProfileMenu, Skeleton } from "../components/ui";
+import { exportLifeGroupReport } from "../utils/lifeGroupReportExport";
 import { BackIcon } from "../components/ui/icons";
 
 // Matches the church's own LGN letter codes — display order follows the paper report
@@ -43,7 +44,8 @@ function computeRows(rows: LifeGroupReportRow[], totalWeeks: number): ReportRowC
       const w = weekNumberOfMonth(s.date);
       if (w >= 1 && w <= totalWeeks) weekCounts[w - 1] = s.checkedIn;
     }
-    const average = sorted.length === 0 ? 0 : round1(sorted.reduce((sum, s) => sum + s.checkedIn, 0) / sorted.length);
+    // Unrounded — the table shows 1 decimal, the Excel export 2.
+    const average = sorted.length === 0 ? 0 : sorted.reduce((sum, s) => sum + s.checkedIn, 0) / sorted.length;
     const actual = sorted.length === 0 ? 0 : sorted[sorted.length - 1].checkedIn;
     const firstTimerTotal = sorted.reduce((sum, s) => sum + s.firstTimerCount, 0);
     const letter = (row.networkName && NETWORK_LETTER[row.networkName]) ?? row.networkName ?? "—";
@@ -67,6 +69,7 @@ function ReportsLifeGroups() {
   const [rows, setRows] = useState<LifeGroupReportRow[] | null>(null);
   const [loading, setLoading] = useState(overseer);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
 
   const monthValue = useMemo(() => `${year}-${String(month).padStart(2, "0")}`, [year, month]);
   const totalWeeks = useMemo(() => weeksInMonth(`${monthValue}-01`), [monthValue]);
@@ -99,6 +102,33 @@ function ReportsLifeGroups() {
       })
     : [];
 
+  const handleExport = async () => {
+    setExporting(true);
+    setError(null);
+    try {
+      const monthName = new Date(year, month - 1, 1).toLocaleDateString("en-US", { month: "long" });
+      await exportLifeGroupReport(
+        computed.map(({ row, letter, average, actual, firstTimerTotal, weekCounts }) => ({
+          letter,
+          code: row.groupName,
+          leaderName: row.leaderName,
+          isCommunity: row.category === "Community",
+          average,
+          actual,
+          firstTimers: firstTimerTotal,
+          weekCounts,
+        })),
+        monthName,
+        year,
+        totalWeeks,
+      );
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't create the Excel file");
+    } finally {
+      setExporting(false);
+    }
+  };
+
   return (
     <AppShell headerRight={<ProfileMenu />}>
       <div className="mb-6 flex items-center gap-4">
@@ -112,21 +142,26 @@ function ReportsLifeGroups() {
         <h1 className="font-display text-2xl font-bold text-[var(--color-navy)]">Life Groups</h1>
       </div>
 
-      <label className="ui-field mb-6 sm:max-w-[200px]">
-        <span className="ui-field-label">Month</span>
-        <input
-          type="month"
-          className="ui-field-input"
-          value={monthValue}
-          onChange={(e) => {
-            const [y, m] = e.target.value.split("-").map(Number);
-            if (y && m) {
-              setYear(y);
-              setMonth(m);
-            }
-          }}
-        />
-      </label>
+      <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+        <label className="ui-field w-full sm:max-w-[200px]">
+          <span className="ui-field-label">Month</span>
+          <input
+            type="month"
+            className="ui-field-input"
+            value={monthValue}
+            onChange={(e) => {
+              const [y, m] = e.target.value.split("-").map(Number);
+              if (y && m) {
+                setYear(y);
+                setMonth(m);
+              }
+            }}
+          />
+        </label>
+        <Button type="button" variant="secondary" onClick={handleExport} disabled={loading || exporting || computed.length === 0}>
+          {exporting ? "Exporting…" : "Export to Excel"}
+        </Button>
+      </div>
 
       {error && <p className="error mb-4">{error}</p>}
 
@@ -181,7 +216,7 @@ function ReportsLifeGroups() {
                       {row.leaderName}
                     </td>
                     <td className="border-b border-[var(--color-border)] px-3 py-2 text-center text-[var(--color-text-secondary)]">
-                      {average}
+                      {round1(average)}
                     </td>
                     <td className="border-b border-[var(--color-border)] px-3 py-2 text-center text-[var(--color-text-secondary)]">
                       {actual}

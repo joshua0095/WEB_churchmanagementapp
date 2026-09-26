@@ -86,6 +86,18 @@ button {
   font-family: inherit;
 }
 
+/* With preflight skipped, a <button> styled only with utilities kept the browser's grey
+   outset border and grey fill (e.g. the attendance roster's check button, "Edit time").
+   This is preflight's own button reset, put in the lowest layer so any border/background
+   a component or utility sets — ui.css classes (unlayered), `border`/`bg-…` utilities —
+   still wins over it. */
+@layer theme {
+  button {
+    border: 0 solid;
+    background-color: transparent;
+  }
+}
+
 /* SweetAlert2 theming (see src/swal.ts) — !important is needed because
    SweetAlert2 injects its own stylesheet at runtime, after this one, so an
    unqualified rule here would otherwise lose the cascade to its defaults. */

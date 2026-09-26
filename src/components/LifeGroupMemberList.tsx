@@ -49,10 +49,11 @@ function LifeGroupMemberList({ people, onCheckIn, onUndo, onToggled }: LifeGroup
             onClick={() => handleToggle(person)}
             aria-label={person.recordId ? `Unmark ${person.name} as present` : `Mark ${person.name} as present`}
             className={[
-              "flex w-20 shrink-0 items-center justify-center border-none outline-none transition-colors focus-visible:shadow-[0_0_0_3px_rgba(242,183,5,0.5)]",
+              "relative flex w-20 shrink-0 items-center justify-center border-none outline-none transition-colors focus-visible:shadow-[0_0_0_3px_rgba(242,183,5,0.5)]",
               person.recordId
                 ? "bg-[var(--color-gold)] text-[var(--color-text-on-gold)]"
-                : "bg-transparent text-[var(--color-text-secondary)] hover:bg-black/5",
+                : // Inset divider from the name area — same as AttendanceRosterScreen's, scaled to this shorter row.
+                  "bg-transparent text-[var(--color-text-secondary)] before:absolute before:inset-y-4 before:left-0 before:w-px before:bg-[var(--color-border)] hover:bg-black/5",
             ].join(" ")}
           >
             {person.recordId ? (

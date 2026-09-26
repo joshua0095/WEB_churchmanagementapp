@@ -248,10 +248,11 @@ function AttendanceRosterScreen({
                 onClick={() => handleToggle(person)}
                 aria-label={person.recordId ? `Unmark ${person.name} as present` : `Mark ${person.name} as present`}
                 className={[
-                  "flex w-24 shrink-0 items-center justify-center transition-colors",
+                  "relative flex w-24 shrink-0 items-center justify-center transition-colors",
                   person.recordId
                     ? "bg-[var(--color-gold)] text-[var(--color-text-on-gold)]"
-                    : "bg-transparent text-[var(--color-text-secondary)] hover:bg-black/5",
+                    : // Inset divider from the name area — stops short of the row's top and bottom edges.
+                      "bg-transparent text-[var(--color-text-secondary)] before:absolute before:inset-y-5 before:left-0 before:w-px before:bg-[var(--color-border)] hover:bg-black/5",
                 ].join(" ")}
               >
                 {person.recordId ? (

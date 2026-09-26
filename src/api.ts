@@ -996,7 +996,9 @@ function sundaysInMonth(y: number, m: number): number[] {
 // Which Sunday's week a date falls in — a date before the month's first Sunday still
 // counts as week 1, and a date after the last Sunday stays in that last week.
 export function weekNumberOfMonth(iso: string): number {
-  const [y, m, d] = iso.split("-").map(Number);
+  // Only the date part — the API sends session dates with a time ("2026-09-27T00:00:00"),
+  // and a day of "27T00:00:00" parses to NaN, which silently dropped every date into week 1.
+  const [y, m, d] = iso.slice(0, 10).split("-").map(Number);
   const sundays = sundaysInMonth(y, m);
   let week = 1;
   for (let i = 0; i < sundays.length; i++) {

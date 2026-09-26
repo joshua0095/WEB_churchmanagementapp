@@ -39,6 +39,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+        // exceljs (~930 KB) only loads when an admin exports a report — don't make every
+        // install precache it; it's fetched normally on first use instead.
+        globIgnores: ['**/exceljs*.js'],
       },
     }),
   ],
