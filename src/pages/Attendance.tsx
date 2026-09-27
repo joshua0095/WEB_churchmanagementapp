@@ -1,587 +1,489 @@
-import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import {
-  addLifeGroupMember,
+  createLifeGroup,
   getAttendanceEvents,
-  getCongregationRoster,
+  getLifeGroups,
   getMyLifeGroups,
-  getWorkerRoster,
-  lifeGroupCheckIn,
-  openAttendanceSession,
-  undoLifeGroupCheckIn,
+  getUsers,
   type AttendanceEvent,
-  type AttendanceTrackingType,
-  type LifeGroup,
+  type LifeGroupCategory,
+  type User,
 } from "../api";
 import { isAdmin, isMis } from "../auth";
-import ChurchWeekPicker from "../components/ChurchWeekPicker";
-import FollowUpModal from "../components/FollowUpModal";
-import LifeGroupMemberList from "../components/LifeGroupMemberList";
 import {
-  Accordion,
-  AppShell,
-  Button,
-  Card,
-  DatePicker,
-  Modal,
-  ProfileMenu,
-  ProgressBar,
-  Skeleton,
-  TextField,
-} from "../components/ui";
-import { AttendanceIcon, BackIcon, HeadcountIcon, LifeGroupIcon, UserListIcon } from "../components/ui/icons";
-import { TopbarSearchIcon } from "../components/ui/shellIcons";
-import { useLifeGroupSessions } from "../hooks/useLifeGroupSessions";
-import { successToast } from "../swal";
+  LIFE_GROUPS_EVENT,
+  ROSTER_LABELS,
+  eventCheckInUrl,
+  formatShortDate,
+  getLastEvent,
+  getLastLifeGroup,
+  headcountUrl,
+  isSunday,
+  isValidIsoDate,
+  lifeGroupCheckInUrl,
+  recentDateOptions,
+  relativeDayLabel,
+  setLastEvent,
+  setLastLifeGroup,
+  type RosterKind,
+} from "../components/attendance/attendanceFlow";
+import { Modal, useToast } from "../components/dialogs";
+import { AppShell, Button, DatePicker, ProfileMenu, SelectField, Skeleton, TextField } from "../components/ui";
+import { AttendanceIcon, BackIcon, CalendarIcon, HeadcountIcon, LifeGroupIcon } from "../components/ui/icons";
+import { CheckThinIcon } from "../components/ui/shellIcons";
 
-function dateToIso(d: Date): string {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+interface GroupOption {
+  id: number;
+  groupName: string;
+  category: LifeGroupCategory;
 }
 
-function todayIso(): string {
-  return dateToIso(new Date());
-}
-
-function formatLongDate(iso: string): string {
-  return new Date(`${iso}T00:00:00`).toLocaleDateString("en-US", {
-    weekday: "long",
-    year: "numeric",
-    month: "long",
-    day: "numeric",
-  });
-}
-
-// A Sunday-only event's date picker refuses every other day outright, rather than just
-// suggesting one — driven by Event.sundayOnly (an admin-configurable flag, see Settings)
-// instead of a name heuristic, since the events list itself is becoming dynamic.
+// A Sunday-only event's "Other date" calendar refuses every other day outright.
 const NON_SUNDAY_DAYS_OF_WEEK = [1, 2, 3, 4, 5, 6];
 
-function suggestedDateFor(event: AttendanceEvent): string {
-  const now = new Date();
-  if (event.sundayOnly) now.setDate(now.getDate() - now.getDay());
-  return dateToIso(now);
+function rostersFor(event: AttendanceEvent): RosterKind[] {
+  if (event.rosterScope === "Workers") return ["workers"];
+  if (event.rosterScope === "Congregation") return ["congregation"];
+  return ["workers", "congregation"];
 }
 
-interface Progress {
-  total: number;
-  checkedInCount: number;
+/** The card's meta line, built from the event's settings (Settings → Attendance). */
+function eventMeta(event: AttendanceEvent): string {
+  const days = event.sundayOnly ? "Sundays only" : "Any day";
+  const roster = event.rosterScope === "Both" ? "Workers & Congregation" : event.rosterScope;
+  return `${days} · ${roster}`;
 }
 
-type Step = "event" | "date" | "type" | "lifegroups";
+function parseGroupParam(raw: string | null): number | null {
+  const n = raw ? Number(raw) : NaN;
+  return Number.isInteger(n) && n > 0 ? n : null;
+}
 
+interface EventCardProps {
+  selected: boolean;
+  icon: ReactNode;
+  name: string;
+  meta: string;
+  onSelect: () => void;
+}
+
+function EventCard({ selected, icon, name, meta, onSelect }: EventCardProps) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={selected}
+      className={["att-event", selected && "att-event--selected"].filter(Boolean).join(" ")}
+      onClick={onSelect}
+    >
+      <span className="att-event-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="att-event-text">
+        <span className="att-event-name">{name}</span>
+        <span className="att-event-meta">{meta}</span>
+      </span>
+      <span className="att-event-check" aria-hidden="true">
+        {selected && <CheckThinIcon strokeWidth={3} />}
+      </span>
+    </button>
+  );
+}
+
+interface CountCardProps {
+  to: string;
+  primary?: boolean;
+  icon: ReactNode;
+  title: string;
+  description: string;
+  onClick?: () => void;
+}
+
+function CountCard({ to, primary, icon, title, description, onClick }: CountCardProps) {
+  return (
+    <Link to={to} onClick={onClick} className={["att-count", primary && "att-count--primary"].filter(Boolean).join(" ")}>
+      <span className="att-count-icon" aria-hidden="true">
+        {icon}
+      </span>
+      <span className="att-count-text">
+        <span className="att-count-title">{title}</span>
+        <span className="att-count-desc">{description}</span>
+      </span>
+      <BackIcon className="att-count-arrow" aria-hidden="true" />
+    </Link>
+  );
+}
+
+/** Step 1 of the attendance flow — event, date and how to count on one page. Tapping a
+ * "how to count" card goes straight to Check-in or Headcount; the selections live in the
+ * URL so Back/Change from there lands right here with them intact. */
 function Attendance() {
-  const navigate = useNavigate();
+  const toast = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const overseer = isAdmin() || isMis();
 
-  const [checkingAccess, setCheckingAccess] = useState(!overseer);
-  const [accessError, setAccessError] = useState<string | null>(null);
-
-  const [myGroups, setMyGroups] = useState<LifeGroup[]>([]);
-  const {
-    sessions,
-    expandedLoading,
-    error: sessionError,
-    setError: setSessionError,
-    loadGroupSession,
-    changeGroupDate,
-    refreshGroupSession,
-    patchGroupMember,
-  } = useLifeGroupSessions();
-  const [addMemberGroupId, setAddMemberGroupId] = useState<number | null>(null);
-  const [newMemberName, setNewMemberName] = useState("");
-  const [newMemberIsFirstTimer, setNewMemberIsFirstTimer] = useState(false);
-  const [addingMember, setAddingMember] = useState(false);
-  const [followUpGroupId, setFollowUpGroupId] = useState<number | null>(null);
-  const [groupSearch, setGroupSearch] = useState("");
-
   const [events, setEvents] = useState<AttendanceEvent[]>([]);
-  const [loadingEvents, setLoadingEvents] = useState(true);
+  const [groups, setGroups] = useState<GroupOption[]>([]);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const [step, setStep] = useState<Step>("event");
-  const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
-  const [date, setDate] = useState(todayIso());
+  const [eventKey, setEventKey] = useState<string | null>(() => searchParams.get("event") ?? getLastEvent());
+  const [groupId, setGroupId] = useState<number | null>(() => parseGroupParam(searchParams.get("group")) ?? getLastLifeGroup());
+  const [date, setDate] = useState<string | null>(() => {
+    const d = searchParams.get("date");
+    return isValidIsoDate(d) ? d : null;
+  });
+  const [otherDateOpen, setOtherDateOpen] = useState(false);
 
-  const [trackingType, setTrackingType] = useState<AttendanceTrackingType | null>(null);
-  const [workerProgress, setWorkerProgress] = useState<Progress | null>(null);
-  const [congregationProgress, setCongregationProgress] = useState<Progress | null>(null);
-  const [loadingProgress, setLoadingProgress] = useState(false);
+  const [addGroupOpen, setAddGroupOpen] = useState(false);
+  const [users, setUsers] = useState<User[]>([]);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newLeaderId, setNewLeaderId] = useState("");
+  const [creatingGroup, setCreatingGroup] = useState(false);
+  const [addGroupError, setAddGroupError] = useState<string | null>(null);
 
-  // Life Group leaders (not Admin/MIS) skip this hub entirely — they only
-  // ever manage their own group(s), never Bible Reading / WHS / Worker's Empowerment.
+  // Admin/MIS see every event plus every life group. Anyone else only ever takes
+  // attendance for the life group(s) they lead — the other events are Admin/MIS-only at
+  // the API level — so for them this page is just the Life Groups path.
   useEffect(() => {
-    if (overseer) return;
-    getMyLifeGroups()
-      .then((groups) => {
-        if (groups.length === 0) {
-          setAccessError("You don't have access to Attendance.");
-        } else {
-          setMyGroups(groups);
-        }
-        setCheckingAccess(false);
-      })
-      .catch((err) => {
-        setAccessError(err instanceof Error ? err.message : "Failed to load your life groups");
-        setCheckingAccess(false);
-      });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [overseer]);
-
-  // A leader with only the one Life Group sees it as a forced-open, non-collapsible
-  // Accordion — there's nothing to pick, so its session loads immediately rather than
-  // waiting for a header click that will never come.
-  useEffect(() => {
-    if (myGroups.length !== 1) return;
-    const only = myGroups[0];
-    if (!sessions[only.id] && expandedLoading !== only.id) void loadGroupSession(only);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [myGroups]);
-
-  useEffect(() => {
-    if (!overseer) return;
-    getAttendanceEvents()
-      .then(setEvents)
-      .catch((err) => setError(err instanceof Error ? err.message : "Failed to load events"))
-      .finally(() => setLoadingEvents(false));
-  }, [overseer]);
-
-  useEffect(() => {
-    if (!overseer || selectedEventId === null || step !== "type") return;
     let cancelled = false;
-    setLoadingProgress(true);
-    setError(null);
-
     (async () => {
       try {
-        const session = await openAttendanceSession(selectedEventId, date);
-        if (cancelled) return;
-        setTrackingType(session.trackingType);
-
-        if (session.trackingType === "Headcount") {
-          setWorkerProgress(null);
-          setCongregationProgress(null);
-          return;
+        if (overseer) {
+          const [loadedEvents, loadedGroups] = await Promise.all([getAttendanceEvents(), getLifeGroups()]);
+          if (cancelled) return;
+          setEvents(loadedEvents);
+          setGroups(loadedGroups);
+        } else {
+          const mine = await getMyLifeGroups();
+          if (cancelled) return;
+          if (mine.length === 0) setError("You don't have access to Attendance.");
+          setGroups(mine);
         }
-
-        const rosterScope = events.find((e) => e.id === selectedEventId)?.rosterScope ?? "Both";
-        const [workers, congregation] = await Promise.all([
-          rosterScope !== "Congregation" ? getWorkerRoster(session.id) : null,
-          rosterScope !== "Workers" ? getCongregationRoster(session.id) : null,
-        ]);
-        if (cancelled) return;
-        setWorkerProgress(workers && { total: workers.total, checkedInCount: workers.checkedInCount });
-        setCongregationProgress(congregation && { total: congregation.total, checkedInCount: congregation.checkedInCount });
       } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load attendance progress");
+        if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load attendance");
       } finally {
-        if (!cancelled) setLoadingProgress(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-
     return () => {
       cancelled = true;
     };
-  }, [overseer, selectedEventId, date, step, events]);
+  }, [overseer]);
 
-  if (!overseer && checkingAccess) {
-    return (
-      <AppShell headerRight={<ProfileMenu />}>
-        <div className="page-header">
-          <h1>Attendance</h1>
-        </div>
-        <Skeleton className="h-24 w-full rounded-md" />
-      </AppShell>
-    );
-  }
+  // Once loaded, drop a remembered/URL selection that no longer exists, and fall back to
+  // a sensible default so there's always something selected.
+  useEffect(() => {
+    if (loading) return;
+    const eventValid =
+      (eventKey === LIFE_GROUPS_EVENT && groups.length > 0) || (overseer && events.some((e) => String(e.id) === eventKey));
+    if (!eventValid) {
+      const fallback = overseer && events.length > 0 ? String(events[0].id) : groups.length > 0 ? LIFE_GROUPS_EVENT : null;
+      if (fallback !== eventKey) {
+        setEventKey(fallback);
+        setDate(null);
+      }
+    }
+    if (groupId === null || !groups.some((g) => g.id === groupId)) {
+      const fallbackGroup = groups.length === 1 ? groups[0].id : null;
+      if (fallbackGroup !== groupId) setGroupId(fallbackGroup);
+    }
+  }, [loading, overseer, events, groups, eventKey, groupId]);
 
-  if (!overseer && accessError) {
-    return (
-      <AppShell headerRight={<ProfileMenu />}>
-        <div className="page-header">
-          <h1>Attendance</h1>
-        </div>
-        <p className="helper-text">{accessError}</p>
-      </AppShell>
-    );
-  }
+  const isLifeGroups = eventKey === LIFE_GROUPS_EVENT;
+  const selectedEvent = !isLifeGroups ? events.find((e) => String(e.id) === eventKey) : undefined;
+  const selectedGroup = isLifeGroups ? groups.find((g) => g.id === groupId) : undefined;
+  // A Church life group's session is always that week's Sunday, so it gets Sunday chips
+  // just like a Sunday-only event; a Community group can meet any day.
+  const sundaysOnly = isLifeGroups ? selectedGroup?.category !== "Community" : !!selectedEvent?.sundayOnly;
+  const dateReady = isLifeGroups ? !!selectedGroup : !!selectedEvent;
+  const dateOptions = recentDateOptions(sundaysOnly);
+  const effectiveDate = date && (!sundaysOnly || isSunday(date)) ? date : dateOptions[0];
+  const pickedOutsideOptions = !dateOptions.includes(effectiveDate);
 
-  const singleGroup = myGroups.length === 1;
-  const groupQuery = groupSearch.trim().toLowerCase();
-  const visibleGroups = groupQuery
-    ? myGroups.filter((g) => g.groupName.toLowerCase().includes(groupQuery))
-    : myGroups;
+  // Mirrors the selection into the URL (replace, not push) so a refresh keeps it and the
+  // check-in page's Back/Change can link straight back to it.
+  const paramsString = searchParams.toString();
+  useEffect(() => {
+    if (loading) return;
+    const next = new URLSearchParams();
+    if (eventKey) next.set("event", eventKey);
+    if (isLifeGroups && groupId !== null) next.set("group", String(groupId));
+    if (dateReady) next.set("date", effectiveDate);
+    if (next.toString() !== paramsString) setSearchParams(next, { replace: true });
+  }, [loading, eventKey, isLifeGroups, groupId, dateReady, effectiveDate, paramsString, setSearchParams]);
 
-  const handleAddMember = async () => {
-    if (addMemberGroupId === null || !newMemberName.trim()) return;
-    setAddingMember(true);
-    try {
-      await addLifeGroupMember(addMemberGroupId, newMemberName.trim(), newMemberIsFirstTimer);
-      setNewMemberName("");
-      setNewMemberIsFirstTimer(false);
-      const groupId = addMemberGroupId;
-      setAddMemberGroupId(null);
-      await refreshGroupSession(groupId);
-      successToast("Member added");
-    } catch (err) {
-      setSessionError(err instanceof Error ? err.message : "Failed to add member");
-    } finally {
-      setAddingMember(false);
+  const selectEvent = (key: string) => {
+    if (key === eventKey) return;
+    setEventKey(key);
+    setDate(null);
+    setLastEvent(key);
+  };
+
+  const selectGroup = (id: number | null) => {
+    setGroupId(id);
+    setDate(null);
+    if (id !== null) setLastLifeGroup(id);
+  };
+
+  const openAddGroup = async () => {
+    setAddGroupOpen(true);
+    setAddGroupError(null);
+    if (users.length === 0) {
+      try {
+        setUsers(await getUsers());
+      } catch (err) {
+        setAddGroupError(err instanceof Error ? err.message : "Failed to load leaders");
+      }
     }
   };
 
-  const selectedEvent = events.find((e) => e.id === selectedEventId) ?? null;
-
-  const selectEvent = (event: AttendanceEvent) => {
-    setSelectedEventId(event.id);
-    setDate(suggestedDateFor(event));
-    setTrackingType(null);
-    setStep("date");
+  const closeAddGroup = () => {
+    setAddGroupOpen(false);
+    setNewGroupName("");
+    setNewLeaderId("");
+    setAddGroupError(null);
   };
 
-  const goToSubModule = (path: string) => {
-    if (selectedEventId === null) return;
-    navigate(`/attendance/${path}?eventId=${selectedEventId}&date=${date}`);
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim() || !newLeaderId) return;
+    setCreatingGroup(true);
+    setAddGroupError(null);
+    try {
+      const created = await createLifeGroup(Number(newLeaderId), newGroupName.trim());
+      setGroups(await getLifeGroups());
+      selectGroup(created.id);
+      closeAddGroup();
+      toast.show({ type: "success", title: "Life group added" });
+    } catch (err) {
+      setAddGroupError(err instanceof Error ? err.message : "Failed to create life group");
+    } finally {
+      setCreatingGroup(false);
+    }
   };
+
+  const dateNote = !dateReady
+    ? null
+    : isLifeGroups && sundaysOnly
+      ? "Church life groups are counted by week, so only Sundays are shown."
+      : sundaysOnly
+        ? "This event only happens on Sundays, so only Sundays are shown."
+        : "Most recent days are shown first.";
+
+  const chip = (iso: string, topLine: string) => {
+    const selected = iso === effectiveDate;
+    return (
+      <button
+        key={iso}
+        type="button"
+        className={["att-date", selected && "att-date--selected"].filter(Boolean).join(" ")}
+        aria-pressed={selected}
+        onClick={() => setDate(iso)}
+      >
+        <span className="att-date-top">{topLine || " "}</span>
+        <span className="att-date-main">{formatShortDate(iso)}</span>
+      </button>
+    );
+  };
+
+  // Life Groups' own section is inserted before Date, which shifts the later numbers.
+  const dateStep = isLifeGroups ? 3 : 2;
 
   return (
-    <AppShell headerRight={<ProfileMenu />}>
-      <div className="page-header">
-        <h1>Attendance</h1>
-      </div>
+    <AppShell headerRight={<ProfileMenu />} pageClassName="att-page att-page--setup">
+      <header className="att-setup-header">
+        <h1 className="att-setup-title">Take attendance</h1>
+        <p className="att-setup-sub">Pick the event, confirm the date, then choose how to count.</p>
+      </header>
 
-      {error && <p className="error mb-4">{error}</p>}
-
-      {step === "event" && (
+      {error ? (
+        <p className="att-empty">{error}</p>
+      ) : loading ? (
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-20 w-full rounded-lg" />
+          <Skeleton className="h-20 w-full rounded-lg" />
+          <Skeleton className="h-16 w-full rounded-lg" />
+        </div>
+      ) : (
         <>
-          <p className="helper-text mb-6">Choose what you're taking attendance for.</p>
-          {overseer && loadingEvents ? (
-            <Skeleton className="h-14 w-full max-w-md rounded-md" />
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {overseer &&
-                events.map((event) => (
-                  <button
-                    key={event.id}
-                    type="button"
-                    onClick={() => selectEvent(event)}
-                    className="cursor-pointer border-0 bg-transparent p-0 text-left"
-                  >
-                    <Card className="flex items-center gap-3 !p-5">
-                      <AttendanceIcon className="h-6 w-6 shrink-0 text-[var(--color-navy)]" />
-                      <span className="font-display text-lg font-bold text-[var(--color-navy)]">{event.name}</span>
-                    </Card>
-                  </button>
-                ))}
-              {/* A non-overseer only ever has access to their own Life Group(s) — Bible
-                  Reading / WHS / Worker's Empowerment / Headcount are Admin/MIS-only
-                  at the API level, so there's nothing else to show them here. */}
-              {(overseer || myGroups.length > 0) && (
-                <button
-                  type="button"
-                  onClick={() => (overseer ? navigate("/attendance/lifegroups") : setStep("lifegroups"))}
-                  className="cursor-pointer border-0 bg-transparent p-0 text-left"
-                >
-                  <Card className="flex items-center gap-3 !p-5">
-                    <LifeGroupIcon className="h-6 w-6 shrink-0 text-[var(--color-navy)]" />
-                    <span className="font-display text-lg font-bold text-[var(--color-navy)]">Life Groups</span>
-                  </Card>
-                </button>
-              )}
-            </div>
-          )}
-        </>
-      )}
-
-      {step === "lifegroups" && !overseer && (
-        <>
-          <button
-            type="button"
-            onClick={() => setStep("event")}
-            className="mb-4 mt-2 flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-sm font-bold text-[var(--color-text-secondary)] hover:text-[var(--color-navy)]"
-          >
-            <BackIcon className="h-4 w-4" /> Back
-          </button>
-
-          <p className="helper-text mb-4">
-            {singleGroup ? "Take attendance for your Life Group." : "Tap a Life Group to take its attendance."}
-          </p>
-
-          {sessionError && <p className="error mb-4">{sessionError}</p>}
-
-          {!singleGroup && (
-            <label className="devo-search mb-4">
-              <TopbarSearchIcon />
-              <input
-                type="search"
-                placeholder="Search your life groups"
-                aria-label="Search life groups"
-                value={groupSearch}
-                onChange={(e) => setGroupSearch(e.target.value)}
-              />
-            </label>
-          )}
-
-          {visibleGroups.length === 0 && <p className="helper-text">No life groups match your search.</p>}
-
-          <div className="flex flex-col gap-3">
-            {visibleGroups.map((group) => {
-              const session = sessions[group.id];
-              return (
-                <Accordion
-                  key={group.id}
-                  forceOpen={singleGroup}
-                  onToggle={(open) => {
-                    if (open && !sessions[group.id] && expandedLoading !== group.id) void loadGroupSession(group);
-                  }}
-                  header={
-                    <div className="flex flex-1 items-center justify-between gap-4">
-                      <div className="flex items-center gap-3">
-                        <LifeGroupIcon className="h-6 w-6 shrink-0 text-[var(--color-navy)]" />
-                        <div>
-                          <p className="text-lg font-bold text-[var(--color-navy)]">{group.groupName}</p>
-                          <p className="text-sm text-[var(--color-text-secondary)]">
-                            {group.category === "Community" ? "Community" : "Church"} Life Group
-                          </p>
-                        </div>
-                      </div>
-                      {session && (
-                        <div className="hidden min-w-40 sm:block">
-                          <p className="text-sm font-semibold text-[var(--color-text-secondary)]">
-                            {session.roster.checkedInCount} of {session.roster.total} present
-                          </p>
-                          <ProgressBar value={session.roster.checkedInCount} max={session.roster.total} />
-                        </div>
-                      )}
-                    </div>
-                  }
-                >
-                  {session ? (
-                    <div className="flex flex-col gap-4">
-                      <div className="flex flex-wrap items-end justify-between gap-3">
-                        {group.category === "Community" ? (
-                          <DatePicker
-                            value={session.date}
-                            onChange={(iso) => changeGroupDate(group, iso)}
-                            className="max-w-[200px]"
-                          />
-                        ) : (
-                          <ChurchWeekPicker
-                            value={session.date}
-                            onChange={(iso) => changeGroupDate(group, iso)}
-                            className="max-w-[200px]"
-                          />
-                        )}
-                      </div>
-                      <LifeGroupMemberList
-                        people={session.roster.people}
-                        onCheckIn={(memberId) => lifeGroupCheckIn(session.sessionId, memberId)}
-                        onUndo={undoLifeGroupCheckIn}
-                        onToggled={(memberId, recordId) => patchGroupMember(group.id, memberId, recordId)}
-                      />
-                      <div className="flex flex-wrap gap-3">
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => setAddMemberGroupId(group.id)}
-                          className="self-start"
-                        >
-                          + Add member
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="secondary"
-                          onClick={() => setFollowUpGroupId(group.id)}
-                          className="self-start"
-                        >
-                          Follow up
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Skeleton className="h-16 w-full rounded-md" />
-                  )}
-                </Accordion>
-              );
-            })}
-          </div>
-
-          <FollowUpModal
-            open={followUpGroupId !== null}
-            onClose={() => setFollowUpGroupId(null)}
-            sessionId={followUpGroupId !== null ? (sessions[followUpGroupId]?.sessionId ?? null) : null}
-            people={followUpGroupId !== null ? (sessions[followUpGroupId]?.roster.people ?? []) : []}
-          />
-
-          <Modal
-            open={addMemberGroupId !== null}
-            onClose={() => {
-              setAddMemberGroupId(null);
-              setNewMemberIsFirstTimer(false);
-            }}
-            title="Add member"
-            footer={
-              <>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => {
-                    setAddMemberGroupId(null);
-                    setNewMemberIsFirstTimer(false);
-                  }}
-                >
-                  Cancel
-                </Button>
-                <Button type="button" onClick={handleAddMember} disabled={addingMember || !newMemberName.trim()}>
-                  {addingMember ? "Adding..." : "Add"}
-                </Button>
-              </>
-            }
-          >
-            <div className="flex flex-col gap-3">
-              <TextField
-                label="Full name"
-                value={newMemberName}
-                onChange={(e) => setNewMemberName(e.target.value)}
-                placeholder="Enter their name"
-                autoFocus
-              />
-              <label className="flex items-center gap-2 text-sm font-semibold text-[var(--color-text-primary)]">
-                <input
-                  type="checkbox"
-                  checked={newMemberIsFirstTimer}
-                  onChange={(e) => setNewMemberIsFirstTimer(e.target.checked)}
+          <section className="att-section" aria-labelledby="att-step-event">
+            <h2 className="att-section-label" id="att-step-event">
+              1 · Event
+            </h2>
+            <div className="att-events" role="radiogroup" aria-labelledby="att-step-event">
+              {events.map((event) => (
+                <EventCard
+                  key={event.id}
+                  selected={String(event.id) === eventKey}
+                  icon={<AttendanceIcon />}
+                  name={event.name}
+                  meta={eventMeta(event)}
+                  onSelect={() => selectEvent(String(event.id))}
                 />
-                First-timer
-              </label>
-            </div>
-          </Modal>
-        </>
-      )}
-
-      {step === "date" && selectedEvent && (
-        <>
-          <button
-            type="button"
-            onClick={() => setStep("event")}
-            className="mb-4 mt-2 flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-sm font-bold text-[var(--color-text-secondary)] hover:text-[var(--color-navy)]"
-          >
-            <BackIcon className="h-4 w-4" /> Change event
-          </button>
-          <p className="font-display text-lg font-bold text-[var(--color-navy)]">{selectedEvent.name}</p>
-          <p className="helper-text mb-4">
-            Tap the date this attendance is for.
-            {selectedEvent.sundayOnly && " This event is Sunday-only, so other days can't be picked."}
-          </p>
-          <div className="flex justify-center">
-            <DatePicker
-              inline
-              value={date}
-              onChange={(iso) => {
-                setDate(iso);
-                setStep("type");
-              }}
-              disabledDaysOfWeek={selectedEvent.sundayOnly ? NON_SUNDAY_DAYS_OF_WEEK : undefined}
-            />
-          </div>
-        </>
-      )}
-
-      {step === "type" && selectedEvent && (
-        <>
-          <button
-            type="button"
-            onClick={() => setStep("date")}
-            className="mb-4 flex cursor-pointer items-center gap-1 border-0 bg-transparent p-0 text-sm font-bold text-[var(--color-text-secondary)] hover:text-[var(--color-navy)]"
-          >
-            <BackIcon className="h-4 w-4" /> Change date
-          </button>
-          <div className="mb-6">
-            <p className="font-display text-lg font-bold text-[var(--color-navy)]">{selectedEvent.name}</p>
-            <p className="text-base font-semibold text-[var(--color-text-secondary)]">{formatLongDate(date)}</p>
-          </div>
-
-          {trackingType === "Headcount" ? (
-            <Card className="flex flex-col items-start gap-2 !p-6">
-              <p className="font-display text-lg font-bold text-[var(--color-navy)]">
-                This date is tracked via Headcount
-              </p>
-              <p className="text-base text-[var(--color-text-secondary)]">
-                Named Worker/Congregation check-in isn't used for this session — go to Headcount instead.
-              </p>
-              <Button onClick={() => goToSubModule("headcount")}>Go to Headcount</Button>
-            </Card>
-          ) : (
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-              {selectedEvent.rosterScope !== "Congregation" && (
-                <button
-                  type="button"
-                  onClick={() => goToSubModule("workers")}
-                  className="cursor-pointer border-0 bg-transparent p-0 text-left"
-                >
-                  <Card className="flex flex-col gap-3 !p-6">
-                    <div className="flex items-center gap-3">
-                      <UserListIcon className="h-7 w-7 text-[var(--color-navy)]" />
-                      <h2 className="font-display text-lg font-bold text-[var(--color-navy)]">Workers</h2>
-                    </div>
-                    {loadingProgress || !workerProgress ? (
-                      <Skeleton className="h-6 w-32" />
-                    ) : (
-                      <p className="text-base font-semibold text-[var(--color-text-secondary)]">
-                        {workerProgress.checkedInCount} of {workerProgress.total} checked in
-                      </p>
-                    )}
-                    <ProgressBar value={workerProgress?.checkedInCount ?? 0} max={workerProgress?.total ?? 0} />
-                  </Card>
-                </button>
+              ))}
+              {groups.length > 0 && (
+                <EventCard
+                  selected={isLifeGroups}
+                  icon={<LifeGroupIcon />}
+                  name="Life Groups"
+                  meta="Any day · Pick a group"
+                  onSelect={() => selectEvent(LIFE_GROUPS_EVENT)}
+                />
               )}
-
-              {selectedEvent.rosterScope !== "Workers" && (
-                <button
-                  type="button"
-                  onClick={() => goToSubModule("congregation")}
-                  className="cursor-pointer border-0 bg-transparent p-0 text-left"
-                >
-                  <Card className="flex flex-col gap-3 !p-6">
-                    <div className="flex items-center gap-3">
-                      <AttendanceIcon className="h-7 w-7 text-[var(--color-navy)]" />
-                      <h2 className="font-display text-lg font-bold text-[var(--color-navy)]">Congregation</h2>
-                    </div>
-                    {loadingProgress || !congregationProgress ? (
-                      <Skeleton className="h-6 w-32" />
-                    ) : (
-                      <p className="text-base font-semibold text-[var(--color-text-secondary)]">
-                        {congregationProgress.checkedInCount} of {congregationProgress.total} checked in
-                      </p>
-                    )}
-                    <ProgressBar
-                      value={congregationProgress?.checkedInCount ?? 0}
-                      max={congregationProgress?.total ?? 0}
-                    />
-                  </Card>
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => goToSubModule("headcount")}
-                className="cursor-pointer border-0 bg-transparent p-0 text-left"
-              >
-                <Card className="flex flex-col gap-3 !p-6">
-                  <div className="flex items-center gap-3">
-                    <HeadcountIcon className="h-7 w-7 text-[var(--color-navy)]" />
-                    <h2 className="font-display text-lg font-bold text-[var(--color-navy)]">Headcount</h2>
-                  </div>
-                  <p className="text-base font-semibold text-[var(--color-text-secondary)]">
-                    Quick Adults / Youth / Kids count
-                  </p>
-                </Card>
-              </button>
             </div>
+          </section>
+
+          {isLifeGroups && (
+            <section className="att-section" aria-labelledby="att-step-group">
+              <h2 className="att-section-label" id="att-step-group">
+                2 · Life Group
+              </h2>
+              <div className="att-group-row">
+                <SelectField
+                  label="Life Group"
+                  className="att-group-select"
+                  value={groupId !== null ? String(groupId) : ""}
+                  onChange={(e) => selectGroup(e.target.value ? Number(e.target.value) : null)}
+                >
+                  <option value="">Choose a life group…</option>
+                  {groups.map((g) => (
+                    <option key={g.id} value={g.id}>
+                      {g.groupName} · {g.category === "Community" ? "Community" : "Church"}
+                    </option>
+                  ))}
+                </SelectField>
+                {overseer && (
+                  <Button type="button" variant="outline" className="att-group-add" onClick={() => void openAddGroup()}>
+                    + Add Life Group
+                  </Button>
+                )}
+              </div>
+            </section>
           )}
+
+          <section className="att-section" aria-labelledby="att-step-date">
+            <h2 className="att-section-label" id="att-step-date">
+              {dateStep} · Date
+            </h2>
+            {dateReady ? (
+              <>
+                <div className="att-dates">
+                  {dateOptions.map((iso) => chip(iso, relativeDayLabel(iso)))}
+                  {pickedOutsideOptions && chip(effectiveDate, relativeDayLabel(effectiveDate) || "Picked")}
+                  <button type="button" className="att-date att-date--other" onClick={() => setOtherDateOpen(true)}>
+                    <CalendarIcon aria-hidden="true" />
+                    <span className="att-date-main">Other date</span>
+                  </button>
+                </div>
+                {dateNote && <p className="att-note">{dateNote}</p>}
+              </>
+            ) : (
+              <p className="att-note">Choose a life group first.</p>
+            )}
+          </section>
+
+          <section className="att-section" aria-labelledby="att-step-count">
+            <h2 className="att-section-label" id="att-step-count">
+              {dateStep + 1} · How to count
+            </h2>
+            {isLifeGroups ? (
+              selectedGroup ? (
+                <div className="att-counts">
+                  <CountCard
+                    primary
+                    to={lifeGroupCheckInUrl(selectedGroup.id, effectiveDate)}
+                    icon={<AttendanceIcon />}
+                    title="Check in group members"
+                    description={`Tick names from the ${selectedGroup.groupName} list`}
+                    onClick={() => setLastLifeGroup(selectedGroup.id)}
+                  />
+                </div>
+              ) : (
+                <p className="att-note">Choose a life group first.</p>
+              )
+            ) : selectedEvent ? (
+              <div className="att-counts">
+                {rostersFor(selectedEvent).map((roster) => (
+                  <CountCard
+                    key={roster}
+                    primary
+                    to={eventCheckInUrl(selectedEvent.id, effectiveDate, roster)}
+                    icon={<AttendanceIcon />}
+                    title={`Check in ${ROSTER_LABELS[roster]}`}
+                    description={`Tick names from the ${ROSTER_LABELS[roster]} list`}
+                    onClick={() => setLastEvent(selectedEvent.id)}
+                  />
+                ))}
+                <CountCard
+                  to={headcountUrl(selectedEvent.id, effectiveDate)}
+                  icon={<HeadcountIcon />}
+                  title="Headcount"
+                  description="Quick count of adults, youth and kids"
+                  onClick={() => setLastEvent(selectedEvent.id)}
+                />
+              </div>
+            ) : null}
+          </section>
         </>
+      )}
+
+      <Modal open={otherDateOpen} onClose={() => setOtherDateOpen(false)} size="sm" title="Pick a date">
+        <div className="att-calendar">
+          <DatePicker
+            inline
+            value={effectiveDate}
+            onChange={(iso) => {
+              setDate(iso);
+              setOtherDateOpen(false);
+            }}
+            disabledDaysOfWeek={sundaysOnly ? NON_SUNDAY_DAYS_OF_WEEK : undefined}
+          />
+        </div>
+      </Modal>
+
+      {overseer && (
+        <Modal
+          open={addGroupOpen}
+          onClose={closeAddGroup}
+          size="sm"
+          title="Add Life Group"
+          footer={
+            <>
+              <Button type="button" variant="outline" onClick={closeAddGroup}>
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleCreateGroup()}
+                disabled={creatingGroup || !newGroupName.trim() || !newLeaderId}
+              >
+                {creatingGroup ? "Adding…" : "Add group"}
+              </Button>
+            </>
+          }
+        >
+          <TextField
+            label="Group name"
+            value={newGroupName}
+            onChange={(e) => setNewGroupName(e.target.value)}
+            placeholder="e.g. Norzagaray Life Group"
+            data-autofocus
+          />
+          <SelectField label="Leader" value={newLeaderId} onChange={(e) => setNewLeaderId(e.target.value)}>
+            <option value="">Select a leader…</option>
+            {users.map((u) => (
+              <option key={u.id} value={u.id}>
+                {u.name}
+              </option>
+            ))}
+          </SelectField>
+          {addGroupError && (
+            <p className="att-field-error" role="alert">
+              {addGroupError}
+            </p>
+          )}
+        </Modal>
       )}
     </AppShell>
   );

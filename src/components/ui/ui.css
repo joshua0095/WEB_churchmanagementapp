@@ -531,6 +531,50 @@
   color: var(--color-gold);
 }
 
+/* Focused mode (AppShell's mobileFocus): back button + task title in place of the brand. */
+.app-topbar-focus-back {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(247, 242, 231, 0.08);
+  color: var(--color-bg);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.app-topbar-focus-back svg {
+  width: 20px;
+  height: 20px;
+  transform: rotate(90deg);
+}
+.app-topbar-focus-text {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.app-topbar-focus-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 1.0625rem;
+  line-height: 1.2;
+  color: var(--color-bg);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.app-topbar-focus-subtitle {
+  font-size: 0.75rem;
+  color: var(--color-navy-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 /* ----- Account menu (topbar) ----- */
 .account-menu {
   position: relative;
@@ -735,6 +779,11 @@
   font-weight: 600;
   color: #9a6f10;
 }
+/* Hidden in the AppShell's focused mode — `display: grid` above would otherwise override
+   the [hidden] attribute. */
+.app-bottom-nav[hidden] {
+  display: none;
+}
 @media (min-width: 1024px) {
   .app-bottom-nav {
     display: none;
@@ -802,6 +851,78 @@
 .app-more-sheet-item--danger svg {
   color: var(--color-danger);
 }
+.app-more-sheet-item--active {
+  font-weight: 600;
+}
+.app-more-sheet-item-label {
+  flex: 1;
+}
+.app-more-sheet-item svg.app-more-sheet-chevron {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  transition: transform 0.15s ease;
+}
+.app-more-sheet-item svg.app-more-sheet-chevron--open {
+  transform: rotate(180deg);
+}
+/* Expandable group (e.g. People → Workers / Congregation), mirroring the desktop sidebar's subnav. */
+.app-more-sheet-subnav-wrap {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  transition:
+    grid-template-rows 0.25s cubic-bezier(0.32, 0.72, 0, 1),
+    margin 0.25s cubic-bezier(0.32, 0.72, 0, 1),
+    opacity 0.2s ease;
+}
+/* Vertical spacing lives here, not on the inner subnav, so the collapsed track is truly 0 tall. */
+.app-more-sheet-subnav-wrap--open {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  margin: 0.1rem 0 0.2rem;
+}
+.app-more-sheet-subnav-wrap > .app-more-sheet-subnav {
+  min-height: 0;
+  overflow: hidden;
+}
+.app-more-sheet-sublink {
+  transform: translateY(-4px);
+  transition: transform 0.25s ease;
+}
+.app-more-sheet-subnav-wrap--open .app-more-sheet-sublink {
+  transform: none;
+}
+.app-more-sheet-subnav {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  margin-left: 1.6rem;
+  padding-left: 1rem;
+  border-left: 1px solid var(--color-border);
+}
+.app-more-sheet-sublink {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 0.6rem;
+  border: none;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--color-text-secondary);
+  font-size: 0.9rem;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.app-more-sheet-sublink:active {
+  background: rgba(11, 28, 51, 0.06);
+}
+.app-more-sheet-sublink--active {
+  color: var(--color-navy);
+  font-weight: 600;
+}
 .app-more-sheet-divider {
   margin: 0.3rem 0.6rem;
   border-top: 1px solid var(--color-border);
@@ -839,14 +960,14 @@
 .app-more-sheet {
   animation: app-more-sheet-in 0.32s cubic-bezier(0.32, 0.72, 0, 1);
 }
-.app-more-sheet > .app-more-sheet-item {
+.app-more-sheet > :is(.app-more-sheet-item, .app-more-sheet-group) {
   animation: app-more-item-in 0.3s ease-out backwards;
 }
-.app-more-sheet > .app-more-sheet-item:nth-child(2) { animation-delay: 60ms; }
-.app-more-sheet > .app-more-sheet-item:nth-child(3) { animation-delay: 90ms; }
-.app-more-sheet > .app-more-sheet-item:nth-child(4) { animation-delay: 120ms; }
-.app-more-sheet > .app-more-sheet-item:nth-child(5) { animation-delay: 150ms; }
-.app-more-sheet > .app-more-sheet-item:nth-child(n + 6) { animation-delay: 180ms; }
+.app-more-sheet > :is(.app-more-sheet-item, .app-more-sheet-group):nth-child(2) { animation-delay: 60ms; }
+.app-more-sheet > :is(.app-more-sheet-item, .app-more-sheet-group):nth-child(3) { animation-delay: 90ms; }
+.app-more-sheet > :is(.app-more-sheet-item, .app-more-sheet-group):nth-child(4) { animation-delay: 120ms; }
+.app-more-sheet > :is(.app-more-sheet-item, .app-more-sheet-group):nth-child(5) { animation-delay: 150ms; }
+.app-more-sheet > :is(.app-more-sheet-item, .app-more-sheet-group):nth-child(n + 6) { animation-delay: 180ms; }
 .app-more-sheet-root.is-closing .app-more-sheet-backdrop {
   animation: app-more-backdrop-out 0.22s ease-in forwards;
 }
@@ -862,6 +983,7 @@
   .app-more-sheet {
     animation-duration: 1ms !important;
     animation-delay: 0ms !important;
+    transition-duration: 1ms !important;
   }
 }
 

@@ -105,12 +105,21 @@ interface AppShellProps {
   /** Extra class on the page content wrapper, for a page that needs its own width/padding
    * (e.g. Home's full-bleed mobile banner). */
   pageClassName?: string;
+  /** Mobile "focused mode" for a task screen (e.g. attendance check-in): the brand top bar
+   * becomes a navy header with a back button + title, and the bottom tab bar is hidden so
+   * the page's own sticky action bar owns the bottom edge. Desktop is unaffected. */
+  mobileFocus?: {
+    title: string;
+    subtitle?: string;
+    onBack: () => void;
+    backLabel?: string;
+  };
 }
 
 /** Authenticated app layout: a persistent (collapsible) sidebar + top bar on desktop
  * (≥1024px), collapsing to a navy top bar + fixed bottom tab bar with a "More" sheet
  * on mobile. */
-function AppShell({ children, headerRight, pageClassName }: AppShellProps) {
+function AppShell({ children, headerRight, pageClassName, mobileFocus }: AppShellProps) {
   const [collapsed, setCollapsed] = useState(getSidebarCollapsed);
   const [manualExpanded, setManualExpanded] = useState<Record<string, boolean>>({});
   const [moreOpen, setMoreOpen] = useState(false);
@@ -176,7 +185,9 @@ function AppShell({ children, headerRight, pageClassName }: AppShellProps) {
   };
 
   const roleLabel = getRoleLabel();
-  const breadcrumb = BREADCRUMBS[location.pathname];
+  // Falls back to the route's top-level section for parameterized paths
+  // (e.g. /attendance/3/2026-09-27/checkin → Attendance).
+  const breadcrumb = BREADCRUMBS[location.pathname] ?? BREADCRUMBS[`/${location.pathname.split("/")[1]}`];
   const visibleMobileTabs = MOBILE_TABS.filter(canSeeItem);
   const mobileTabLabels = new Set(MOBILE_TABS.map((t) => t.label));
   const moreItems = NAV_GROUPS.flatMap((g) => g.items).filter((i) => !mobileTabLabels.has(i.label) && canSeeItem(i));
@@ -187,7 +198,7 @@ function AppShell({ children, headerRight, pageClassName }: AppShellProps) {
   };
 
   return (
-    <div className="app-shell">
+    <div className={["app-shell", mobileFocus && "app-shell--focus"].filter(Boolean).join(" ")}>
       {/* ---------- Desktop sidebar ---------- */}
       <aside className={["app-sidebar", collapsed && "app-sidebar--collapsed"].filter(Boolean).join(" ")}>
         <div className="app-sidebar-brand">
@@ -312,19 +323,41 @@ function AppShell({ children, headerRight, pageClassName }: AppShellProps) {
         </header>
 
         {/* Mobile top bar */}
-        <header className="app-topbar app-topbar--mobile">
-          <Logo size={32} className="app-topbar-mobile-logo" />
-          <div className="app-topbar-mobile-brand">
-            <div className="app-topbar-mobile-name">JIL Norzagaray</div>
-            <div className="app-topbar-mobile-tag">Connect</div>
-          </div>
-          {headerRight}
-        </header>
+        {mobileFocus ? (
+          <header className="app-topbar app-topbar--mobile app-topbar--focus">
+            <button
+              type="button"
+              className="app-topbar-focus-back"
+              aria-label={mobileFocus.backLabel ?? "Back"}
+              onClick={mobileFocus.onBack}
+            >
+              <NavChevronIcon />
+            </button>
+            <div className="app-topbar-focus-text">
+              <div className="app-topbar-focus-title">{mobileFocus.title}</div>
+              {mobileFocus.subtitle && <div className="app-topbar-focus-subtitle">{mobileFocus.subtitle}</div>}
+            </div>
+          </header>
+        ) : (
+          <header className="app-topbar app-topbar--mobile">
+            <Logo size={32} className="app-topbar-mobile-logo" />
+            <div className="app-topbar-mobile-brand">
+              <div className="app-topbar-mobile-name">JIL Norzagaray</div>
+              <div className="app-topbar-mobile-tag">Connect</div>
+            </div>
+            {headerRight}
+          </header>
+        )}
 
         <div className={["page", pageClassName].filter(Boolean).join(" ")}>{children}</div>
 
         {/* Mobile bottom tab bar */}
-        <nav aria-label="Main" className="app-bottom-nav" style={{ gridTemplateColumns: `repeat(${visibleMobileTabs.length + 1}, minmax(0, 1fr))` }}>
+        <nav
+          aria-label="Main"
+          className="app-bottom-nav"
+          hidden={!!mobileFocus || undefined}
+          style={{ gridTemplateColumns: `repeat(${visibleMobileTabs.length + 1}, minmax(0, 1fr))` }}
+        >
           {visibleMobileTabs.map((item) => {
             const active = item.to === location.pathname;
             return (
@@ -383,12 +416,50 @@ function AppShell({ children, headerRight, pageClassName }: AppShellProps) {
             }}
           >
             <div className="app-more-sheet-handle" aria-hidden="true" />
-            {moreItems.map((item) => (
-              <button key={item.label} type="button" className="app-more-sheet-item" onClick={() => goToItem(item)}>
-                {item.icon}
-                <span>{item.label}</span>
-              </button>
-            ))}
+            {moreItems.map((item) =>
+              item.children ? (
+                <div key={item.label} className="app-more-sheet-group">
+                  <button
+                    type="button"
+                    className={["app-more-sheet-item", isChildActive(item) && "app-more-sheet-item--active"].filter(Boolean).join(" ")}
+                    aria-expanded={isExpanded(item)}
+                    onClick={() => setManualExpanded((prev) => ({ ...prev, [item.label]: !isExpanded(item) }))}
+                  >
+                    {item.icon}
+                    <span className="app-more-sheet-item-label">{item.label}</span>
+                    <NavChevronIcon
+                      className={["app-more-sheet-chevron", isExpanded(item) && "app-more-sheet-chevron--open"].filter(Boolean).join(" ")}
+                    />
+                  </button>
+                  {/* Always mounted so the grid-rows transition can animate both open and close; inert while collapsed. */}
+                  <div
+                    className={["app-more-sheet-subnav-wrap", isExpanded(item) && "app-more-sheet-subnav-wrap--open"].filter(Boolean).join(" ")}
+                    inert={!isExpanded(item)}
+                  >
+                    <div className="app-more-sheet-subnav">
+                      {item.children.map((child) => (
+                        <button
+                          key={child.label}
+                          type="button"
+                          className={["app-more-sheet-sublink", child.to === location.pathname && "app-more-sheet-sublink--active"]
+                            .filter(Boolean)
+                            .join(" ")}
+                          aria-current={child.to === location.pathname ? "page" : undefined}
+                          onClick={() => goTo(child.to)}
+                        >
+                          {child.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <button key={item.label} type="button" className="app-more-sheet-item" onClick={() => goToItem(item)}>
+                  {item.icon}
+                  <span>{item.label}</span>
+                </button>
+              ),
+            )}
             <button type="button" className="app-more-sheet-item" onClick={() => goTo("/profile")}>
               {me ? <InitialAvatar name={me.name} photoUrl={me.photoDataUrl} size="xs" /> : <InitialAvatar name="?" />}
               <span>My Profile</span>

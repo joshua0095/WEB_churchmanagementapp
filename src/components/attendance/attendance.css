@@ -1,0 +1,912 @@
+/* ---------- Attendance flow: Setup → Check-in / Headcount ---------- */
+
+/* ===== Shared ===== */
+.att-link {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-navy);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.att-link--muted {
+  color: var(--color-text-secondary);
+}
+.att-link--small {
+  margin-left: 8px;
+  font-size: 0.8125rem;
+}
+
+.att-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  margin-top: 8px;
+  padding: 32px 24px;
+  border-radius: 16px;
+  border: 1px solid var(--color-line);
+  background: var(--color-surface);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+.att-empty p {
+  margin: 0;
+  max-width: 440px;
+}
+.att-empty-action {
+  display: inline-flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 10px;
+  background: var(--color-navy);
+  color: var(--color-bg);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.att-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.att-checkbox input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--color-navy);
+}
+.att-field-error {
+  margin: 0;
+  font-size: 0.875rem;
+  color: var(--color-danger);
+}
+.att-calendar {
+  display: flex;
+  justify-content: center;
+}
+
+/* ===== Step 1: Setup ===== */
+.att-setup-header {
+  margin-bottom: 8px;
+}
+.att-setup-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.75rem;
+  color: var(--color-navy);
+}
+.att-setup-sub {
+  display: none;
+  margin: 6px 0 0;
+  font-size: 0.9375rem;
+  color: var(--color-text-secondary);
+}
+
+.att-section {
+  margin-top: 24px;
+}
+.att-section-label {
+  margin: 0 0 10px;
+  font-family: var(--font-sans);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.att-note {
+  margin: 10px 0 0;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+
+/* Event radio cards */
+.att-events {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+.att-event {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 76px;
+  padding: 14px 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: var(--color-surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.att-event:hover {
+  border-color: var(--color-line-strong);
+}
+/* 2px navy border without shifting the layout: 1px border + 1px ring. */
+.att-event--selected,
+.att-event--selected:hover {
+  border-color: var(--color-navy);
+  box-shadow: 0 0 0 1px var(--color-navy);
+}
+.att-event:focus-visible,
+.att-count:focus-visible,
+.att-date:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-gold) 60%, transparent);
+  outline-offset: 2px;
+}
+.att-event-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--color-bg);
+  color: var(--color-navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.15s, color 0.15s;
+}
+.att-event-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.att-event--selected .att-event-icon {
+  background: var(--color-navy);
+  color: var(--color-gold);
+}
+.att-event-text {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.att-event-name {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-navy);
+}
+.att-event-meta {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+.att-event-check {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--color-navy);
+}
+.att-event--selected .att-event-check {
+  border-color: var(--color-gold);
+  background: var(--color-gold);
+}
+.att-event-check svg {
+  width: 13px;
+  height: 13px;
+}
+
+/* Life Group picker */
+.att-group-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 12px;
+}
+.att-group-select {
+  flex: 1 1 280px;
+  max-width: 440px;
+}
+.att-group-add {
+  height: 44px;
+}
+
+/* Date chips */
+.att-dates {
+  display: flex;
+  gap: 10px;
+  /* Scrolls sideways on mobile rather than wrapping; the negative margin lets chips run
+     to the screen edge while the first one still lines up with the page content. */
+  overflow-x: auto;
+  margin: 0 -1.25rem;
+  padding: 2px 1.25rem 6px;
+  scrollbar-width: none;
+}
+.att-dates::-webkit-scrollbar {
+  display: none;
+}
+.att-date {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 112px;
+  height: 60px;
+  padding: 0 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 12px;
+  background: var(--color-surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.att-date-top {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+}
+.att-date-main {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--color-navy);
+  white-space: nowrap;
+}
+.att-date--selected {
+  border-color: var(--color-navy);
+  background: var(--color-navy);
+}
+.att-date--selected .att-date-top {
+  color: var(--color-gold);
+}
+.att-date--selected .att-date-main {
+  color: var(--color-bg);
+}
+.att-date--other {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  border: 1.5px dashed var(--color-line-strong);
+  background: transparent;
+}
+.att-date--other svg {
+  width: 18px;
+  height: 18px;
+  color: var(--color-navy);
+}
+
+/* How-to-count link cards */
+.att-counts {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+}
+.att-count {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 84px;
+  padding: 16px 18px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: var(--color-surface);
+  color: var(--color-navy);
+  text-decoration: none;
+  transition: transform 0.12s ease, box-shadow 0.15s;
+}
+.att-count:hover {
+  color: var(--color-navy);
+  box-shadow: 0 8px 20px rgba(18, 32, 61, 0.08);
+}
+.att-count:active {
+  transform: scale(0.99);
+}
+.att-count-icon {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--color-bg);
+  color: var(--color-navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.att-count-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.att-count-text {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.att-count-title {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+.att-count-desc {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+.att-count-arrow {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  transform: rotate(180deg);
+}
+.att-count--primary {
+  border-color: var(--color-navy);
+  background: var(--color-navy);
+  color: var(--color-bg);
+}
+.att-count--primary:hover {
+  color: var(--color-bg);
+}
+.att-count--primary .att-count-icon {
+  background: rgba(247, 242, 231, 0.1);
+  color: var(--color-gold);
+}
+.att-count--primary .att-count-desc {
+  color: var(--color-navy-faint);
+}
+.att-count--primary .att-count-arrow {
+  color: var(--color-gold);
+}
+
+/* ===== Step 2: Check-in ===== */
+/* No bottom padding: the sticky progress bar is the page's last thing and owns that edge. */
+.page.att-page--checkin,
+.page.att-page--headcount {
+  padding-bottom: 0;
+}
+
+/* On mobile the AppShell's focused navy header replaces this in-page one. */
+.att-checkin-header {
+  display: none;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.att-back {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  margin-top: 2px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.att-back svg {
+  width: 20px;
+  height: 20px;
+}
+.att-checkin-heading {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.att-checkin-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 1.875rem;
+  line-height: 1.15;
+  color: var(--color-navy);
+}
+.att-checkin-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+.att-roster-chip {
+  padding: 3px 10px;
+  border-radius: 999px;
+  background: var(--color-navy);
+  color: var(--color-gold);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+.att-checkin-date {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: var(--color-text-primary);
+}
+.att-checkin-date svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-text-secondary);
+}
+
+.att-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.att-search {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 50px;
+  padding: 0 14px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 12px;
+  background: var(--color-surface);
+}
+.att-search:focus-within {
+  border-color: var(--color-navy);
+}
+.att-search svg {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-secondary);
+}
+.att-search input {
+  flex-grow: 1;
+  min-width: 0;
+  height: 100%;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 1rem; /* 16px stops iOS zoom on focus */
+  color: var(--color-text-primary);
+}
+.att-walkin,
+.att-toolbar-btn {
+  flex-shrink: 0;
+  height: 50px;
+  border-radius: 12px !important;
+}
+/* Mobile: the walk-in button collapses to a 48px "+" icon button. */
+.att-walkin {
+  width: 48px;
+  height: 48px;
+  padding: 0 !important;
+}
+.att-walkin-plus {
+  font-size: 1.5rem;
+  font-weight: 500;
+  line-height: 1;
+}
+.att-walkin-label {
+  display: none;
+}
+
+.att-filter {
+  display: flex;
+  gap: 4px;
+  margin: 14px 0;
+  padding: 4px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-navy) 6%, transparent);
+}
+.att-filter-option {
+  flex: 1 1 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.att-filter-option[aria-pressed="true"] {
+  background: var(--color-navy);
+  color: #fff;
+}
+.att-filter-count {
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-navy) 9%, transparent);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  color: var(--color-text-primary);
+}
+.att-filter-option[aria-pressed="true"] .att-filter-count {
+  background: var(--color-surface);
+  color: var(--color-navy);
+}
+
+.att-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+.att-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 68px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: background-color 0.15s;
+  -webkit-tap-highlight-color: transparent;
+}
+.att-row + .att-row {
+  border-top: 1px solid var(--color-line);
+}
+.att-row--checked {
+  background: #eef7f1;
+}
+.att-avatar {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-bg);
+  color: var(--color-navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  transition: background-color 0.15s, color 0.15s;
+}
+.att-row--checked .att-avatar {
+  background: var(--color-success);
+  color: #fff;
+}
+.att-row-text {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.att-row-name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-navy);
+  overflow-wrap: anywhere;
+}
+.att-first-timer {
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-gold) 18%, transparent);
+  color: #9a6f10;
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+.att-row-status {
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+}
+.att-row-status--checked {
+  color: var(--color-success);
+  font-weight: 500;
+}
+.att-time-edit {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  cursor: default;
+}
+.att-time-input {
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--color-line-strong);
+  border-radius: 8px;
+  background: var(--color-surface);
+  font-family: inherit;
+  font-size: 1rem;
+}
+.att-toggle {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  min-width: 112px;
+  height: 40px;
+  padding: 0 12px;
+  border: 1.5px solid var(--color-navy);
+  border-radius: 10px;
+  background: var(--color-surface);
+  font-family: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-navy);
+  cursor: pointer;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.att-toggle[aria-pressed="true"] {
+  border-color: var(--color-success);
+  background: var(--color-success);
+  color: #fff;
+}
+.att-toggle svg {
+  width: 16px;
+  height: 16px;
+}
+.att-toggle:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-gold) 60%, transparent);
+  outline-offset: 2px;
+}
+.att-row--skeleton {
+  cursor: default;
+}
+.att-skeleton-line {
+  height: 14px;
+  width: 45%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-navy) 8%, transparent);
+}
+
+.att-bottom-bar {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin: 20px -1.25rem 0;
+  padding: 12px 1.25rem calc(12px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--color-line);
+  background: var(--color-surface);
+}
+.att-progress {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.att-progress-text {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+.att-progress-count {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 700;
+  color: var(--color-navy);
+}
+.att-progress-track {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-navy) 8%, transparent);
+  overflow: hidden;
+}
+.att-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-gold);
+  transition: width 0.25s ease;
+}
+.att-done {
+  flex-shrink: 0;
+  min-width: 112px;
+  height: 50px;
+  border-radius: 12px !important;
+}
+
+/* ===== Headcount ===== */
+.hc-wrap {
+  max-width: 560px;
+  margin: 0 auto;
+}
+.hc-helper {
+  margin: 0 0 14px;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+.hc-counters {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.hc-counter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 84px;
+  padding: 14px 16px 14px 20px;
+  border: 1px solid var(--color-line);
+  border-radius: 16px;
+  background: var(--color-surface);
+}
+.hc-counter-label {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-navy);
+}
+.hc-counter-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.hc-step {
+  flex-shrink: 0;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 1.625rem;
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.hc-step:active:not(:disabled) {
+  transform: scale(0.94);
+}
+.hc-step:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.hc-step--minus {
+  border: 1.5px solid var(--color-line-strong);
+  background: var(--color-surface);
+  color: var(--color-navy);
+}
+.hc-step--plus {
+  border: none;
+  background: var(--color-navy);
+  color: var(--color-gold);
+}
+.hc-counter-value,
+.hc-counter-input {
+  width: 72px;
+  height: 52px;
+  font-family: var(--font-display);
+  font-size: 1.875rem;
+  font-weight: 700;
+  text-align: center;
+  color: var(--color-navy);
+}
+.hc-counter-value {
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  cursor: text;
+}
+.hc-counter-value:hover:not(:disabled) {
+  background: var(--color-bg);
+}
+.hc-counter-input {
+  border: 1.5px solid var(--color-navy);
+  border-radius: 10px;
+  background: var(--color-surface);
+  outline: none;
+}
+.hc-total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 88px;
+  padding: 16px 24px;
+  border-radius: 16px;
+  background: var(--color-navy);
+}
+.hc-total-label {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-gold);
+}
+.hc-total-value {
+  font-family: var(--font-display);
+  font-size: 2.5rem;
+  font-weight: 700;
+  color: var(--color-bg);
+}
+.att-bottom-bar--solo {
+  margin-top: 24px;
+}
+.hc-save {
+  width: 100%;
+  height: 54px;
+  border-radius: 12px !important;
+  font-size: 1rem !important;
+}
+
+/* ===== Desktop (≥1024px) ===== */
+@media (min-width: 1024px) {
+  .att-setup-title {
+    font-size: 2.125rem;
+  }
+  .att-setup-sub {
+    display: block;
+  }
+  .att-events,
+  .att-counts {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .att-dates {
+    flex-wrap: wrap;
+    overflow: visible;
+    margin: 0;
+    padding: 0;
+  }
+
+  .att-checkin-header {
+    display: flex;
+  }
+  .att-walkin {
+    width: auto;
+    height: 50px;
+    padding: 0 18px !important;
+  }
+  .att-walkin-plus {
+    font-size: 1.125rem;
+  }
+  .att-walkin-label {
+    display: inline;
+  }
+  .att-filter {
+    display: inline-flex;
+  }
+  .att-filter-option {
+    flex: 0 0 auto;
+    padding: 0 14px;
+  }
+  .att-row {
+    padding: 12px 20px;
+    gap: 14px;
+  }
+  .att-toggle {
+    min-width: 140px;
+    height: 44px;
+  }
+  /* Tapping the whole row toggles on mobile (big touch target); on desktop only the
+     button does, so selecting a name to copy it doesn't check someone in. */
+  .att-row {
+    cursor: default;
+  }
+  .att-bottom-bar {
+    margin: 24px 0 0;
+    padding: 14px 0 18px;
+    background: var(--color-bg);
+  }
+}

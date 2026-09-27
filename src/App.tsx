@@ -3,10 +3,10 @@ import "./App.css";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Announcements from "./pages/Announcements";
 import Attendance from "./pages/Attendance";
-import AttendanceCongregation from "./pages/AttendanceCongregation";
+import AttendanceCheckIn from "./pages/AttendanceCheckIn";
 import AttendanceHeadcount from "./pages/AttendanceHeadcount";
-import AttendanceLifeGroups from "./pages/AttendanceLifeGroups";
-import AttendanceWorkers from "./pages/AttendanceWorkers";
+import AttendanceLegacyRedirect from "./pages/AttendanceLegacyRedirect";
+import AttendanceLifeGroupCheckIn from "./pages/AttendanceLifeGroupCheckIn";
 import Devotion from "./pages/Devotion";
 import DevModalsDemo from "./pages/DevModalsDemo";
 import ForgotPassword from "./pages/ForgotPassword";
@@ -45,10 +45,14 @@ function App() {
         <Route path="/settings/:tab" element={<Settings />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/attendance" element={<Attendance />} />
-        <Route path="/attendance/workers" element={<AttendanceWorkers />} />
-        <Route path="/attendance/congregation" element={<AttendanceCongregation />} />
-        <Route path="/attendance/headcount" element={<AttendanceHeadcount />} />
-        <Route path="/attendance/lifegroups" element={<AttendanceLifeGroups />} />
+        <Route path="/attendance/:eventId/:date/checkin" element={<AttendanceCheckIn />} />
+        <Route path="/attendance/:eventId/:date/headcount" element={<AttendanceHeadcount />} />
+        <Route path="/attendance/lifegroups/:groupId/:date/checkin" element={<AttendanceLifeGroupCheckIn />} />
+        {/* The old 4-screen flow's query-string URLs, redirected to the routes above. */}
+        <Route path="/attendance/workers" element={<AttendanceLegacyRedirect to="workers" />} />
+        <Route path="/attendance/congregation" element={<AttendanceLegacyRedirect to="congregation" />} />
+        <Route path="/attendance/headcount" element={<AttendanceLegacyRedirect to="headcount" />} />
+        <Route path="/attendance/lifegroups" element={<AttendanceLegacyRedirect to="lifegroups" />} />
         {/* Not linked from navigation — a preview of the Modal/Toast/useConfirm system. */}
         <Route path="/dev/modals" element={<DevModalsDemo />} />
       </Route>

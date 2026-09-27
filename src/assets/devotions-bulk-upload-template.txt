@@ -1,0 +1,23 @@
+# Devotions bulk upload
+# One devotion per block. Separate blocks with a line of three dashes (---).
+# Email must match a worker's email in the app. Date is YYYY-MM-DD.
+# Every field is required except Notes. A long answer can continue onto the next lines.
+# Lines starting with # are ignored — you can delete these instructions.
+
+Email: juan.delacruz@example.com
+Date: 2026-09-01
+Verse: John 3:16
+Scripture: For God so loved the world, that he gave his only begotten Son, that whosoever believeth in him should not perish, but have everlasting life.
+Observation: God's love is shown in giving, not just in words.
+Application: I will look for one way to give my time to someone this week.
+Prayer: Lord, thank You for Your love. Help me love others the way You love me.
+Notes: Shared at Sunday life group.
+---
+Email: maria.santos@example.com
+Date: 2026-09-01
+Verse: Psalm 23:1
+Scripture: The Lord is my shepherd; I shall not want.
+Observation: David trusts God to provide everything he needs.
+Application: I will stop worrying about this month's bills
+and pray about them each morning instead.
+Prayer: Lord, You are my shepherd. I trust You to provide.

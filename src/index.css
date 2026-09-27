@@ -18,6 +18,7 @@
 @import "./theme.css";
 @import "./components/ui/ui.css";
 @import "./components/dialogs/dialogs.css";
+@import "./components/attendance/attendance.css";
 
 /* Bridges the brand tokens above into Tailwind's own theme namespace so
    utilities like `bg-navy`, `text-gold`, and `font-display` are available.
