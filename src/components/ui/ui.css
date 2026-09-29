@@ -2419,6 +2419,43 @@
   color: #fff;
 }
 
+/* ---------- Session loading screen ----------
+   Shown by ProtectedRoute while a returning, still-signed-in person's session is refreshed
+   on launch. Navy like the login page, so going from one to the other doesn't flash. */
+.session-loading {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
+  background: var(--color-navy);
+  color: var(--color-text-on-navy);
+  text-align: center;
+}
+.session-loading-logo {
+  height: 56px;
+  width: auto;
+  margin-bottom: 8px;
+}
+.session-loading-text {
+  margin: 0;
+  font-size: 15px;
+  color: var(--color-navy-dim);
+}
+.session-loading-note {
+  max-width: 320px;
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 14px;
+  line-height: 1.4;
+  background: color-mix(in srgb, var(--color-text-on-navy) 8%, transparent);
+  color: var(--color-navy-dim);
+}
+
 /* ---------- Login page ----------
    Mobile-first: a photo header with the form in a cream sheet overlapping it.
    ≥1024px: full-bleed photo with the form in a floating card on the right.
@@ -3045,7 +3082,16 @@
   grid-template-columns: minmax(0, 1fr) repeat(4, 132px);
 }
 
+.settings-event-head {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
 .settings-event-name {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 0.9375rem;
   font-weight: 600;
   color: var(--color-text-primary);

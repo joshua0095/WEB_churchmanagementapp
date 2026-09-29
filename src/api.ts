@@ -1,4 +1,4 @@
-import { clearToken, getToken } from "./auth";
+import { clearToken, getToken, setIsAdmin, setIsMis, setModuleAccess, setToken } from "./auth";
 
 export interface User {
   id: string | number;
@@ -100,6 +100,33 @@ export async function login(email: string, password: string): Promise<AuthRespon
     throw new Error(await res.text() || `Login failed (${res.status})`);
   }
   return res.json();
+}
+
+const LAST_REFRESH_KEY = "authLastRefresh";
+const REFRESH_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+/** Sliding session: swaps the stored token for a fresh one (and re-reads admin/MIS/module
+ * access) so someone who keeps opening the app never gets signed out. Throttled — the app
+ * calls this on every launch/foreground, but it only hits the server every few hours. A 401
+ * (expired token or deactivated account) signs out via apiFetch; network errors are ignored
+ * so an offline launch keeps the existing session. */
+export async function refreshSession(force = false): Promise<void> {
+  if (!getToken()) return;
+  const last = Number(localStorage.getItem(LAST_REFRESH_KEY) ?? 0);
+  if (!force && Date.now() - last < REFRESH_INTERVAL_MS) return;
+
+  try {
+    const res = await apiFetch("/api/auth/refresh", { method: "POST" });
+    if (!res.ok) return;
+    const auth: AuthResponse = await res.json();
+    setToken(auth.token);
+    setIsAdmin(auth.isAdmin);
+    setIsMis(auth.isMis);
+    setModuleAccess(auth.moduleAccess);
+    localStorage.setItem(LAST_REFRESH_KEY, String(Date.now()));
+  } catch {
+    // offline / server asleep — try again next time the app is opened
+  }
 }
 
 export async function requestPasswordReset(email: string): Promise<void> {

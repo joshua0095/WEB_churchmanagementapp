@@ -52,6 +52,7 @@ export function clearToken(): void {
   localStorage.removeItem(IS_MIS_KEY);
   localStorage.removeItem(LEGACY_IS_REGISTRAR_KEY);
   localStorage.removeItem(MODULE_ACCESS_KEY);
+  localStorage.removeItem("authLastRefresh"); // refreshSession's throttle stamp (api.ts)
 }
 
 export function isAuthenticated(): boolean {
