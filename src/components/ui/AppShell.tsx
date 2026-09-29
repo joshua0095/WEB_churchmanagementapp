@@ -17,7 +17,7 @@ import {
   NavSettingsIcon,
   ShellLogOutIcon,
 } from "./shellIcons";
-import Logo from "./Logo";
+import jilIcon from "../../assets/jil-icon.png";
 
 interface NavChild {
   label: string;
@@ -202,7 +202,11 @@ function AppShell({ children, headerRight, pageClassName, mobileFocus }: AppShel
       {/* ---------- Desktop sidebar ---------- */}
       <aside className={["app-sidebar", collapsed && "app-sidebar--collapsed"].filter(Boolean).join(" ")}>
         <div className="app-sidebar-brand">
-          <Logo size={collapsed ? 32 : 44} className="app-sidebar-brand-logo" />
+          <img
+            src={jilIcon}
+            alt="Jesus Is Lord Church"
+            className={["app-sidebar-brand-icon", collapsed && "app-sidebar-brand-icon--collapsed"].filter(Boolean).join(" ")}
+          />
           {!collapsed && (
             <div className="app-sidebar-brand-text">
               <div className="app-sidebar-brand-name">JIL Norzagaray</div>
@@ -281,9 +285,10 @@ function AppShell({ children, headerRight, pageClassName, mobileFocus }: AppShel
         </nav>
 
         <div className={["app-user-card", location.pathname === "/profile" && "app-user-card--active"].filter(Boolean).join(" ")}>
-          {location.pathname === "/profile" && <span className="app-nav-ribbon app-nav-ribbon--card" aria-hidden="true" />}
+          {location.pathname === "/profile" && !collapsed && <span className="app-nav-ribbon app-nav-ribbon--card" aria-hidden="true" />}
           <button type="button" className="app-user-card-link" onClick={() => navigate("/profile")} aria-label="My profile">
-            {me ? <InitialAvatar name={me.name} photoUrl={me.photoDataUrl} size="md" tone="gold" /> : <InitialAvatar name="?" tone="gold" />}
+            {/* 36px when collapsed — the 84px rail leaves no room for the 48px avatar. */}
+            <InitialAvatar name={me?.name ?? "?"} photoUrl={me?.photoDataUrl} size={collapsed ? "sm" : "md"} tone="gold" />
             {!collapsed && (
               <span className="app-user-card-info">
                 <span className="app-user-card-name">{me?.name ?? "Loading..."}</span>
@@ -340,7 +345,7 @@ function AppShell({ children, headerRight, pageClassName, mobileFocus }: AppShel
           </header>
         ) : (
           <header className="app-topbar app-topbar--mobile">
-            <Logo size={32} className="app-topbar-mobile-logo" />
+            <img src={jilIcon} alt="Jesus Is Lord Church" className="app-topbar-mobile-logo" />
             <div className="app-topbar-mobile-brand">
               <div className="app-topbar-mobile-name">JIL Norzagaray</div>
               <div className="app-topbar-mobile-tag">Connect</div>

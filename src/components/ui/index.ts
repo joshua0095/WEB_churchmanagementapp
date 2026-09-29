@@ -29,3 +29,5 @@ export { default as SegmentedControl } from "./SegmentedControl";
 export { default as Switch } from "./Switch";
 export { default as CheckTile } from "./CheckTile";
 export { default as TreeList } from "./TreeList";
+export { default as ToolbarMenu } from "./ToolbarMenu";
+export type { ToolbarMenuEntry } from "./ToolbarMenu";

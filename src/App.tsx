@@ -41,7 +41,7 @@ function App() {
         <Route path="/reports/congregation" element={<ReportsCongregation />} />
         <Route path="/reports/lifegroups" element={<ReportsLifeGroups />} />
         <Route path="/reports/devotions" element={<ReportsDevotions />} />
-        <Route path="/settings" element={<Navigate to="/settings/general" replace />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="/settings/:tab" element={<Settings />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/attendance" element={<Attendance />} />

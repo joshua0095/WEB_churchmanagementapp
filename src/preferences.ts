@@ -41,3 +41,53 @@ export function getSidebarCollapsed(): boolean {
 export function setSidebarCollapsed(collapsed: boolean): void {
   localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(collapsed));
 }
+
+export interface DevotionListPrefs {
+  sort: "newest" | "oldest";
+  groupBy: "none" | "week" | "month" | "year";
+  view: "cards" | "compact" | "expanded";
+  layout: "list" | "grid";
+  showDateTile: boolean;
+  showScripture: boolean;
+  showObservation: boolean;
+  showApplication: boolean;
+  showPrayer: boolean;
+  showNotes: boolean;
+}
+
+const DEVOTION_LIST_PREFS_KEY = "devotionListPrefs";
+
+export const DEFAULT_DEVOTION_LIST_PREFS: DevotionListPrefs = {
+  sort: "newest",
+  groupBy: "month",
+  view: "cards",
+  layout: "list",
+  showDateTile: true,
+  showScripture: true,
+  showObservation: true,
+  showApplication: true,
+  showPrayer: true,
+  showNotes: true,
+};
+
+// Storage can be unavailable (private mode, blocked site data) — fall back to the defaults.
+export function getDevotionListPrefs(): DevotionListPrefs {
+  try {
+    const raw = localStorage.getItem(DEVOTION_LIST_PREFS_KEY);
+    if (!raw) return DEFAULT_DEVOTION_LIST_PREFS;
+    const prefs = { ...DEFAULT_DEVOTION_LIST_PREFS, ...JSON.parse(raw) };
+    // "grid" briefly shipped as a view; it is now a layout that any view can use.
+    if (prefs.view === "grid") return { ...prefs, view: "cards", layout: "grid" };
+    return prefs;
+  } catch {
+    return DEFAULT_DEVOTION_LIST_PREFS;
+  }
+}
+
+export function setDevotionListPrefs(prefs: DevotionListPrefs): void {
+  try {
+    localStorage.setItem(DEVOTION_LIST_PREFS_KEY, JSON.stringify(prefs));
+  } catch {
+    // Not persisted this session; the in-memory choice still applies.
+  }
+}

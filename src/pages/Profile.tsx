@@ -12,6 +12,8 @@ import {
   type User,
 } from "../api";
 import { clearToken } from "../auth";
+import ChangePasswordModal from "../components/ChangePasswordModal";
+import QuickSignInCard from "../components/QuickSignInCard";
 import { EditableAvatar } from "../components/PeopleShared";
 import { abbreviateNetworkName } from "../components/networkTree";
 import { AppShell, Button, Card, ProfileMenu, Skeleton, TextField, setCachedMe } from "../components/ui";
@@ -54,6 +56,7 @@ function Profile() {
   const [form, setForm] = useState<ProfileForm>(emptyForm);
   const [photoDataUrl, setPhotoDataUrl] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [passwordOpen, setPasswordOpen] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const load = async () => {
@@ -147,7 +150,7 @@ function Profile() {
             <div className="relative h-28 bg-[var(--color-navy)]">
               <span className="absolute right-12 top-0 h-14 w-[18px] bg-[var(--color-gold)] [clip-path:polygon(0_0,100%_0,100%_100%,50%_80%,0_100%)]" />
             </div>
-            <div className="flex flex-col items-start gap-4 px-6 pb-7 sm:-mt-12 sm:flex-row sm:items-end">
+            <div className="flex flex-col items-start gap-4 -mt-12 px-6 pb-7 sm:flex-row sm:items-end">
               <EditableAvatar name={me.name} photoUrl={photoDataUrl} onChange={setPhotoDataUrl} size="xl" tone="cream" serif />
               <div className="flex min-w-0 flex-1 flex-col gap-1.5 pb-1 sm:pt-17">
                 <h1 className="m-0 font-display text-[1.7rem] font-semibold text-[var(--color-text-primary)]">{me.name}</h1>
@@ -162,7 +165,7 @@ function Profile() {
                   ))}
                 </div>
               </div>
-              <Button type="button" variant="outline" onClick={() => navigate("/forgot-password")} className="shrink-0">
+              <Button type="button" variant="outline" onClick={() => setPasswordOpen(true)} className="shrink-0">
                 <LockIcon className="h-4 w-4" />
                 Change password
               </Button>
@@ -319,6 +322,8 @@ function Profile() {
                 )}
               </Card>
 
+              <QuickSignInCard userId={Number(me.id)} name={me.name} photoDataUrl={me.photoDataUrl ?? null} />
+
               <Card className="!rounded-2xl flex flex-col gap-3.5">
                 <h2 className="m-0 font-display text-lg font-semibold text-[var(--color-text-primary)]">Account</h2>
                 <div className="flex items-center justify-between text-sm">
@@ -334,6 +339,7 @@ function Profile() {
           </div>
         </div>
       ) : null}
+      <ChangePasswordModal open={passwordOpen} onClose={() => setPasswordOpen(false)} />
     </AppShell>
   );
 }

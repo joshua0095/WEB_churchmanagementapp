@@ -12,11 +12,22 @@ import {
 } from "../api";
 import { isAdmin, isMis } from "../auth";
 import DevotionBulkUploadModal from "../components/DevotionBulkUploadModal";
+import DevotionWeekReportModal from "../components/DevotionWeekReportModal";
 import { Modal, useConfirm, useToast } from "../components/dialogs";
-import { AppShell, Button, DropdownMenu, Pagination, ProfileMenu, Skeleton, VersePicker } from "../components/ui";
+import {
+  AppShell,
+  Button,
+  DropdownMenu,
+  Pagination,
+  ProfileMenu,
+  Skeleton,
+  ToolbarMenu,
+  VersePicker,
+  type ToolbarMenuEntry,
+} from "../components/ui";
 import { StarIcon } from "../components/ui/icons";
 import { KebabIcon, NavDevotionIcon, TopbarSearchIcon } from "../components/ui/shellIcons";
-import { getBibleVersionId } from "../preferences";
+import { getBibleVersionId, getDevotionListPrefs, setDevotionListPrefs, type DevotionListPrefs } from "../preferences";
 
 interface Devo {
   id: number;
@@ -29,8 +40,7 @@ interface Devo {
   notes: string;
 }
 
-type FilterKey = "all" | "week" | "verse";
-type GroupKey = "none" | "week" | "month";
+type FilterKey = "all" | "week";
 
 // The API's date field has no timezone suffix (e.g. "2026-09-04T00:00:00"),
 // which JS parses as local midnight on that calendar day — exactly what we
@@ -77,6 +87,11 @@ function formatCardDate(d: Date): string {
   return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric" });
 }
 
+/** "Sep 19, 2026" — the tighter date used on grid tiles. */
+function formatShortDate(d: Date): string {
+  return d.toLocaleDateString("en-US", { year: "numeric", month: "short", day: "numeric" });
+}
+
 function toDateInputValue(d: Date): string {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, "0");
@@ -107,6 +122,102 @@ function monthGroupLabel(d: Date): string {
   return d.toLocaleDateString("en-US", { month: "long", year: "numeric" });
 }
 
+function groupKeyOf(d: Date, groupBy: DevotionListPrefs["groupBy"]): string {
+  if (groupBy === "year") return String(d.getFullYear());
+  if (groupBy === "month") return monthGroupLabel(d);
+  return startOfWeek(d).toISOString();
+}
+
+function groupLabelOf(d: Date, groupBy: DevotionListPrefs["groupBy"]): string {
+  if (groupBy === "year") return String(d.getFullYear());
+  if (groupBy === "month") return monthGroupLabel(d);
+  return weekGroupLabel(d);
+}
+
+const svgProps = {
+  viewBox: "0 0 20 20",
+  fill: "none",
+  stroke: "currentColor",
+  strokeWidth: 1.5,
+  strokeLinecap: "round",
+  strokeLinejoin: "round",
+} as const;
+
+const SortIcon = () => (
+  <svg {...svgProps}>
+    <path d="M6 16V4M3 7l3-3 3 3M14 4v12M11 13l3 3 3-3" />
+  </svg>
+);
+const ViewIcon = () => (
+  <svg {...svgProps}>
+    <rect x="3" y="4" width="14" height="12" rx="2" />
+    <path d="M3 8h14" />
+  </svg>
+);
+const CardsIcon = () => (
+  <svg {...svgProps}>
+    <rect x="3" y="3" width="14" height="6" rx="1.5" />
+    <rect x="3" y="11" width="14" height="6" rx="1.5" />
+  </svg>
+);
+const ListIcon = () => (
+  <svg {...svgProps}>
+    <rect x="3" y="3.5" width="14" height="3.5" rx="1" />
+    <rect x="3" y="8.25" width="14" height="3.5" rx="1" />
+    <rect x="3" y="13" width="14" height="3.5" rx="1" />
+  </svg>
+);
+const GridIcon = () => (
+  <svg {...svgProps}>
+    <rect x="2.5" y="3" width="4" height="6" rx="1" />
+    <rect x="8" y="3" width="4" height="6" rx="1" />
+    <rect x="13.5" y="3" width="4" height="6" rx="1" />
+    <rect x="2.5" y="11" width="4" height="6" rx="1" />
+    <rect x="8" y="11" width="4" height="6" rx="1" />
+    <rect x="13.5" y="11" width="4" height="6" rx="1" />
+  </svg>
+);
+const CompactIcon = () => (
+  <svg {...svgProps}>
+    <path d="M7 5h10M7 10h10M7 15h10M3.5 5h.01M3.5 10h.01M3.5 15h.01" />
+  </svg>
+);
+const ExpandedIcon = () => (
+  <svg {...svgProps}>
+    <rect x="3" y="3" width="14" height="14" rx="1.5" />
+    <path d="M6 7h8M6 10h8M6 13h5" />
+  </svg>
+);
+const NewestIcon = () => (
+  <svg {...svgProps}>
+    <path d="M10 16V4M5 9l5-5 5 5" />
+  </svg>
+);
+const OldestIcon = () => (
+  <svg {...svgProps}>
+    <path d="M10 4v12M5 11l5 5 5-5" />
+  </svg>
+);
+const GroupIcon = () => (
+  <svg {...svgProps}>
+    <rect x="3" y="3" width="6" height="6" rx="1" />
+    <rect x="11" y="3" width="6" height="6" rx="1" />
+    <rect x="3" y="11" width="6" height="6" rx="1" />
+    <rect x="11" y="11" width="6" height="6" rx="1" />
+  </svg>
+);
+type ShowKey = "showDateTile" | "showScripture" | "showObservation" | "showApplication" | "showPrayer" | "showNotes";
+
+/** View-menu "Show" toggles, each listed only under the views that can display it. */
+const SHOW_FIELDS: { key: ShowKey; label: string; views: DevotionListPrefs["view"][] }[] = [
+  { key: "showDateTile", label: "Date tile", views: ["cards", "compact", "expanded"] },
+  { key: "showScripture", label: "Scripture", views: ["cards", "expanded"] },
+  { key: "showObservation", label: "Observation", views: ["cards", "expanded"] },
+  { key: "showApplication", label: "Application", views: ["expanded"] },
+  { key: "showPrayer", label: "Prayer", views: ["expanded"] },
+  { key: "showNotes", label: "Notes", views: ["expanded"] },
+];
+
 /** Auto-grows a textarea to fit its content instead of scrolling internally. */
 function autoGrowRef(el: HTMLTextAreaElement | null) {
   if (!el) return;
@@ -117,7 +228,6 @@ function autoGrowRef(el: HTMLTextAreaElement | null) {
 const FILTER_CHIPS: { key: FilterKey; label: string }[] = [
   { key: "all", label: "All" },
   { key: "week", label: "This week" },
-  { key: "verse", label: "By verse" },
 ];
 
 /** O / A / P steps — Scripture (S) has its own verse-picker markup. */
@@ -194,15 +304,68 @@ function Devotion() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<FilterKey>("all");
-  const [groupBy, setGroupBy] = useState<GroupKey>("month");
+  const [prefs, setPrefs] = useState<DevotionListPrefs>(getDevotionListPrefs);
+  const { sort, groupBy, view, layout } = prefs;
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const listTopRef = useRef<HTMLDivElement>(null);
 
-  // A new search/filter/grouping starts back on page 1 rather than an arbitrary later page.
+  const updatePrefs = (patch: Partial<DevotionListPrefs>) =>
+    setPrefs((prev) => {
+      const next = { ...prev, ...patch };
+      setDevotionListPrefs(next);
+      return next;
+    });
+
+  // A new search/filter/sort/grouping starts back on page 1 rather than an arbitrary later page.
   useEffect(() => {
     setPage(1);
-  }, [query, filter, groupBy]);
+  }, [query, filter, sort, groupBy]);
+
+  const sortEntries: ToolbarMenuEntry[] = [
+    { kind: "radio", label: "Newest first", icon: <NewestIcon />, checked: sort === "newest", onSelect: () => updatePrefs({ sort: "newest" }) },
+    { kind: "radio", label: "Oldest first", icon: <OldestIcon />, checked: sort === "oldest", onSelect: () => updatePrefs({ sort: "oldest" }) },
+    { kind: "divider" },
+    {
+      kind: "submenu",
+      label: "Group by",
+      icon: <GroupIcon />,
+      items: (
+        [
+          ["none", "None"],
+          ["week", "Week"],
+          ["month", "Month"],
+          ["year", "Year"],
+        ] as const
+      ).map(([key, label]) => ({
+        kind: "radio" as const,
+        label,
+        checked: groupBy === key,
+        onSelect: () => updatePrefs({ groupBy: key }),
+      })),
+    },
+  ];
+
+  const viewEntries: ToolbarMenuEntry[] = [
+    { kind: "radio", label: "Cards", icon: <CardsIcon />, checked: view === "cards", onSelect: () => updatePrefs({ view: "cards" }) },
+    { kind: "radio", label: "Compact list", icon: <CompactIcon />, checked: view === "compact", onSelect: () => updatePrefs({ view: "compact" }) },
+    { kind: "radio", label: "Full SOAP", icon: <ExpandedIcon />, checked: view === "expanded", onSelect: () => updatePrefs({ view: "expanded" }) },
+    { kind: "divider" },
+    { kind: "heading", label: "Layout" },
+    { kind: "radio", label: "List", icon: <ListIcon />, checked: layout === "list", onSelect: () => updatePrefs({ layout: "list" }) },
+    { kind: "radio", label: "Grid", icon: <GridIcon />, checked: layout === "grid", onSelect: () => updatePrefs({ layout: "grid" }) },
+    { kind: "divider" },
+    { kind: "heading", label: "Show" },
+    // Only the fields the current view can display — a compact row is just the date and verse.
+    ...SHOW_FIELDS.filter((f) => f.views.includes(view)).map(
+      (f): ToolbarMenuEntry => ({
+        kind: "check",
+        label: f.label,
+        checked: prefs[f.key],
+        onSelect: () => updatePrefs({ [f.key]: !prefs[f.key] }),
+      }),
+    ),
+  ];
 
   const [modal, setModal] = useState<{ mode: "add" | "edit" | "view"; devo: Devo | null } | null>(null);
   const [form, setForm] = useState<DevoForm>(EMPTY_FORM);
@@ -211,6 +374,7 @@ function Devotion() {
   const [saving, setSaving] = useState(false);
   const [versionLabel, setVersionLabel] = useState<string | null>(null);
   const [bulkOpen, setBulkOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const canBulkUpload = isAdmin() || isMis();
 
   const loadDevotions = async () => {
@@ -254,11 +418,9 @@ function Devotion() {
     if (filter === "week") {
       list = list.filter((d) => isThisWeek(d.date));
     }
-    list = [...list].sort((a, b) =>
-      filter === "verse" ? a.verse.localeCompare(b.verse) : b.date.getTime() - a.date.getTime(),
-    );
-    return list;
-  }, [devos, query, filter]);
+    const dir = sort === "newest" ? -1 : 1;
+    return [...list].sort((a, b) => dir * (a.date.getTime() - b.date.getTime()));
+  }, [devos, query, filter, sort]);
 
   // Flags when the date currently chosen in the Add/Edit form already has a
   // devotion — re-checks live as the date field changes, and excludes the
@@ -280,21 +442,21 @@ function Devotion() {
   );
 
   const groups = useMemo(() => {
-    if (filter === "verse" || groupBy === "none") {
+    if (groupBy === "none") {
       return [{ key: "all", label: null as string | null, items: pageItems, total: visible.length }];
     }
-    const keyOf = (d: Devo) => (groupBy === "month" ? monthGroupLabel(d.date) : startOfWeek(d.date).toISOString());
+    const keyOf = (d: Devo) => groupKeyOf(d.date, groupBy);
     // A month/week can straddle two pages — its header count still reflects the whole group.
     const totals = new Map<string, number>();
     for (const d of visible) totals.set(keyOf(d), (totals.get(keyOf(d)) ?? 0) + 1);
     const map = new Map<string, { label: string; items: Devo[] }>();
     for (const d of pageItems) {
       const key = keyOf(d);
-      if (!map.has(key)) map.set(key, { label: groupBy === "month" ? monthGroupLabel(d.date) : weekGroupLabel(d.date), items: [] });
+      if (!map.has(key)) map.set(key, { label: groupLabelOf(d.date, groupBy), items: [] });
       map.get(key)!.items.push(d);
     }
     return [...map.entries()].map(([key, group]) => ({ key, ...group, total: totals.get(key) ?? group.items.length }));
-  }, [visible, pageItems, groupBy, filter]);
+  }, [visible, pageItems, groupBy]);
 
   const goToPage = (next: number) => {
     setPage(next);
@@ -499,6 +661,19 @@ function Devotion() {
                 </span>
               </button>
             )}
+            <button
+              type="button"
+              className="devo-write-btn devo-bulk-btn"
+              onClick={() => setReportOpen(true)}
+              aria-label="Report to leader"
+            >
+              <span className="devo-write-long" aria-hidden="true">
+                Report to leader
+              </span>
+              <span className="devo-write-short" aria-hidden="true">
+                Report
+              </span>
+            </button>
             <button type="button" className="devo-write-btn" onClick={openAdd} aria-label="Write devotion">
               <span className="devo-write-long" aria-hidden="true">
                 + Write devotion
@@ -521,14 +696,10 @@ function Devotion() {
               aria-label="Search devotions"
             />
           </label>
-          <label className="devo-groupby">
-            <span>Group by</span>
-            <select value={groupBy} onChange={(e) => setGroupBy(e.target.value as GroupKey)}>
-              <option value="none">None</option>
-              <option value="week">Week</option>
-              <option value="month">Month</option>
-            </select>
-          </label>
+          <div className="devo-toolbar-menus">
+            <ToolbarMenu label="Sort" icon={<SortIcon />} entries={sortEntries} />
+            <ToolbarMenu label="View" icon={<ViewIcon />} entries={viewEntries} />
+          </div>
         </div>
 
         <div className="devo-chips" role="group" aria-label="Filter devotions">
@@ -579,15 +750,20 @@ function Devotion() {
                     </span>
                   </h2>
                 )}
-                <div className="devo-list">
+                <div className={layout === "grid" ? "devo-list devo-list--grid" : "devo-list"}>
                   {group.items.map((devo) => (
-                    <article key={devo.id} className="devo-card">
-                      <div className="devo-date-tile" aria-hidden="true">
-                        <span className="devo-date-day">{String(devo.date.getDate()).padStart(2, "0")}</span>
-                        <span className="devo-date-weekday">
-                          {devo.date.toLocaleDateString("en-US", { weekday: "short" })}
-                        </span>
-                      </div>
+                    <article
+                      key={devo.id}
+                      className={`devo-card devo-card--${view}${prefs.showDateTile ? "" : " devo-card--no-tile"}`}
+                    >
+                      {prefs.showDateTile && (
+                        <div className="devo-date-tile" aria-hidden="true">
+                          <span className="devo-date-day">{String(devo.date.getDate()).padStart(2, "0")}</span>
+                          <span className="devo-date-weekday">
+                            {devo.date.toLocaleDateString("en-US", { weekday: "short" })}
+                          </span>
+                        </div>
+                      )}
                       <div className="devo-card-body">
                         <p className="devo-card-meta">
                           {/* Stretched over the whole card (see .devo-card-open::after) so a click
@@ -600,13 +776,36 @@ function Devotion() {
                           >
                             {devo.verse}
                           </button>
-                          <span className="devo-card-date">{formatCardDate(devo.date)}</span>
+                          <span className="devo-card-date">
+                            {layout === "grid" ? formatShortDate(devo.date) : formatCardDate(devo.date)}
+                          </span>
                         </p>
-                        {devo.scripture && <p className="devo-card-scripture">“{devo.scripture}”</p>}
-                        {devo.observation && (
+                        {view !== "compact" && prefs.showScripture && devo.scripture && (
+                          <p className="devo-card-scripture">“{devo.scripture}”</p>
+                        )}
+                        {view !== "compact" && prefs.showObservation && devo.observation && (
                           <p className="devo-card-observation">
                             <strong>Observation:</strong> {devo.observation}
                           </p>
+                        )}
+                        {view === "expanded" && (
+                          <>
+                            {prefs.showApplication && devo.application && (
+                              <p className="devo-card-observation">
+                                <strong>Application:</strong> {devo.application}
+                              </p>
+                            )}
+                            {prefs.showPrayer && devo.prayer && (
+                              <p className="devo-card-observation">
+                                <strong>Prayer:</strong> {devo.prayer}
+                              </p>
+                            )}
+                            {prefs.showNotes && devo.notes && (
+                              <p className="devo-card-observation">
+                                <strong>Notes:</strong> {devo.notes}
+                              </p>
+                            )}
+                          </>
                         )}
                       </div>
                       <div className="devo-card-actions" onClick={(e) => e.stopPropagation()}>
@@ -824,6 +1023,8 @@ function Devotion() {
           </div>
         )}
       </Modal>
+
+      <DevotionWeekReportModal open={reportOpen} onClose={() => setReportOpen(false)} devos={devos} />
 
       {canBulkUpload && (
         <DevotionBulkUploadModal open={bulkOpen} onClose={() => setBulkOpen(false)} onImported={loadDevotions} />

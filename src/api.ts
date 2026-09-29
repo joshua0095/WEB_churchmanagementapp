@@ -41,6 +41,8 @@ export interface AuthResponse {
   isAdmin: boolean;
   isMis: boolean;
   moduleAccess: Record<string, boolean>;
+  /** Whether this person has a quick sign-in code set (on any device). */
+  hasQuickPin: boolean;
 }
 
 const API_URL = import.meta.env.VITE_API_URL;
@@ -150,6 +152,83 @@ export async function confirmPasswordReset(token: string, newPassword: string): 
     throw new Error(await res.text() || `Reset failed (${res.status})`);
   }
   return res.json();
+}
+
+export async function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  const res = await apiFetch("/api/auth/change-password", {
+    method: "POST",
+    body: JSON.stringify({ currentPassword, newPassword }),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to change password (${res.status})`);
+  }
+}
+
+/** A quick sign-in failure; `status` 410 means this device can never use it again (forgotten
+ * or turned off), 423 means the code is locked for a while. */
+export class QuickLoginError extends Error {
+  status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.status = status;
+  }
+}
+
+// Plain fetch, not apiFetch: a failed quick sign-in must never trigger the 401 → /login redirect.
+export async function quickLogin(deviceToken: string, pin: string): Promise<AuthResponse> {
+  const res = await fetch(`${API_URL}/api/auth/quick/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ deviceToken, pin }),
+  });
+  if (!res.ok) {
+    throw new QuickLoginError((await res.text()) || `Sign-in failed (${res.status})`, res.status);
+  }
+  return res.json();
+}
+
+export async function getQuickStatus(): Promise<{ hasPin: boolean }> {
+  const res = await apiFetch("/api/auth/quick/status");
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to load quick sign-in (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function setQuickPin(pin: string): Promise<void> {
+  const res = await apiFetch("/api/auth/quick/pin", { method: "PUT", body: JSON.stringify({ pin }) });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to save your code (${res.status})`);
+  }
+}
+
+export async function removeQuickPin(): Promise<void> {
+  const res = await apiFetch("/api/auth/quick/pin", { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to turn off quick sign-in (${res.status})`);
+  }
+}
+
+/** Remembers this device. With no code yet, `pin` becomes the code; otherwise it must match. */
+export async function registerQuickDevice(pin: string): Promise<string> {
+  const res = await apiFetch("/api/auth/quick/devices", { method: "POST", body: JSON.stringify({ pin }) });
+  if (!res.ok) {
+    throw new QuickLoginError((await res.text()) || `Failed to remember this device (${res.status})`, res.status);
+  }
+  return ((await res.json()) as { deviceToken: string }).deviceToken;
+}
+
+/** Best effort — the local entry is removed whether or not this reaches the server. */
+export async function forgetQuickDevice(deviceToken: string): Promise<void> {
+  try {
+    await fetch(`${API_URL}/api/auth/quick/devices/forget`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ deviceToken }),
+    });
+  } catch {
+    // offline — the orphaned server row is harmless without the token
+  }
 }
 
 export interface VerseOfTheDay {

@@ -58,7 +58,8 @@ import {
   TreeList,
 } from "../components/ui";
 import { ChevronDownIcon, TrashIcon } from "../components/ui/icons";
-import { InfoIcon, KebabIcon, TopbarSearchIcon } from "../components/ui/shellIcons";
+import { InfoIcon, KebabIcon, NavChevronIcon, TopbarSearchIcon } from "../components/ui/shellIcons";
+import { MOBILE_LAYOUT_QUERY, useMediaQuery } from "../hooks/useMediaQuery";
 import { buildNetworkTree, flattenNetworksForSelect, SINGLE_SELECT_PARENT_NAME } from "../components/networkTree";
 import { getBibleVersionId, setBibleVersionId, type BibleModule } from "../preferences";
 import { confirmDialog, infoAlert, successToast } from "../swal";
@@ -468,14 +469,20 @@ function Settings() {
   const navigate = useNavigate();
   const { tab } = useParams<{ tab?: string }>();
   const canManageAccess = isAdmin();
+  const isMobile = useMediaQuery(MOBILE_LAYOUT_QUERY);
+  // Mobile, admin, bare /settings: a list of sections, each opening as its own full page.
+  // Desktop keeps the side nav + panel, so bare /settings goes straight to General there.
+  const showSectionList = canManageAccess && isMobile && !tab;
   const activeTab: SettingsTab =
     canManageAccess && SETTINGS_TABS.some((t) => t.key === tab) ? (tab as SettingsTab) : "general";
+  const activeTabLabel = SETTINGS_TABS.find((t) => t.key === activeTab)!.label;
 
   // Keeps the URL canonical — redirects a bogus/disallowed tab segment (or a non-admin
   // landing on an admin-only one) back to whichever tab is actually showing.
   useEffect(() => {
+    if (showSectionList) return;
     if (tab !== activeTab) navigate(`/settings/${activeTab}`, { replace: true });
-  }, [tab, activeTab, navigate]);
+  }, [tab, activeTab, showSectionList, navigate]);
 
   const [versions, setVersions] = useState<BibleVersion[]>([]);
   const [selected, setSelected] = useState<Record<BibleModule, string>>({
@@ -916,17 +923,44 @@ function Settings() {
   };
 
   return (
-    <AppShell>
+    <AppShell
+      mobileFocus={
+        canManageAccess && isMobile && !showSectionList
+          ? { title: activeTabLabel, subtitle: "Settings", onBack: () => navigate("/settings"), backLabel: "Back to settings" }
+          : undefined
+      }
+    >
       <div className="flex flex-col gap-6">
-        <div>
-          <h1 className="m-0 font-display text-[2.1rem] font-semibold text-[var(--color-text-primary)]">Settings</h1>
-          <p className="m-0 mt-1.5 text-[0.9375rem] text-[var(--color-text-secondary)]">
-            Church-wide setup. Changes here apply to everyone using the app.
-          </p>
-        </div>
+        {/* On a mobile section page the focus top bar already names the section. */}
+        {!(canManageAccess && isMobile && !showSectionList) && (
+          <div>
+            <h1 className="m-0 font-display text-[2.1rem] font-semibold text-[var(--color-text-primary)]">Settings</h1>
+            <p className="m-0 mt-1.5 text-[0.9375rem] text-[var(--color-text-secondary)]">
+              Church-wide setup. Changes here apply to everyone using the app.
+            </p>
+          </div>
+        )}
 
-        <div className={canManageAccess ? "settings-layout" : ""}>
-          {canManageAccess && (
+        {showSectionList ? (
+          <nav className="settings-section-list" aria-label="Settings sections">
+            {SETTINGS_TABS.map((t) => (
+              <button
+                key={t.key}
+                type="button"
+                className="settings-section-item"
+                onClick={() => navigate(`/settings/${t.key}`)}
+              >
+                <span className="settings-section-text">
+                  <span className="settings-tab-label">{t.label}</span>
+                  <span className="settings-tab-desc">{t.desc}</span>
+                </span>
+                <NavChevronIcon className="settings-section-chevron" aria-hidden="true" />
+              </button>
+            ))}
+          </nav>
+        ) : (
+        <div className={canManageAccess && !isMobile ? "settings-layout" : ""}>
+          {canManageAccess && !isMobile && (
             <div className="settings-nav" role="tablist" aria-label="Settings sections" aria-orientation="vertical">
               {SETTINGS_TABS.map((t) => (
                 <button
@@ -1245,6 +1279,7 @@ function Settings() {
             )}
           </div>
         </div>
+        )}
       </div>
 
       <Modal
