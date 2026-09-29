@@ -376,9 +376,9 @@
 }
 .toast-inner {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 12px;
-  padding: 14px 8px 16px 14px;
+  padding: 14px 8px 14px 14px;
 }
 .toast-icon {
   flex-shrink: 0;
@@ -412,7 +412,6 @@
 .toast-text {
   flex-grow: 1;
   min-width: 0;
-  padding-top: 1px;
   display: flex;
   flex-direction: column;
   gap: 3px;

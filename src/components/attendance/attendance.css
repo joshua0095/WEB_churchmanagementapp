@@ -74,6 +74,14 @@
   justify-content: center;
 }
 
+/* Date chip → check-in zoom (zoomTransition.ts): the new page is revealed by a script-driven
+   clip-path, so the browser's default cross-fade is switched off for that transition only. */
+html.att-zoom-vt::view-transition-old(root),
+html.att-zoom-vt::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
 /* ===== Step 1: Setup ===== */
 .att-setup-header {
   margin-bottom: 8px;
@@ -104,6 +112,126 @@
   text-transform: uppercase;
   color: var(--color-text-secondary);
 }
+/* Accordion: the open step eases in; finished steps collapse to a summary row. */
+.att-section--open {
+  animation: att-step-in 0.22s ease-out;
+}
+@keyframes att-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .att-section--open {
+    animation: none;
+  }
+}
+.att-section--done {
+  margin-top: 12px;
+}
+.att-section--done + .att-section--open,
+.att-section--open + .att-section--locked {
+  margin-top: 24px;
+}
+.att-section--locked {
+  margin-top: 12px;
+}
+.att-step-locked {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  padding: 10px 16px;
+  border: 1px dashed var(--color-line);
+  border-radius: 14px;
+  opacity: 0.6;
+}
+.att-step-locked .att-section-label {
+  margin: 0;
+}
+.att-step-locked-number {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 1.5px solid var(--color-line-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+.att-step-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  min-height: 64px;
+  padding: 10px 16px;
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  background: var(--color-surface);
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.att-step-summary:hover:not(:disabled) {
+  border-color: var(--color-line-strong);
+}
+.att-step-summary:disabled {
+  cursor: default;
+}
+.att-step-summary:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-gold) 60%, transparent);
+  outline-offset: 2px;
+}
+.att-step-summary-check {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-gold);
+  color: var(--color-navy);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.att-step-summary-check svg {
+  width: 13px;
+  height: 13px;
+}
+.att-step-summary-text {
+  flex-grow: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.att-step-summary-text .att-section-label {
+  margin: 0;
+  font-size: 0.6875rem;
+}
+.att-step-summary-value {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-navy);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.att-step-summary-change {
+  flex-shrink: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-navy);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .att-note {
   margin: 10px 0 0;
   font-size: 0.8125rem;
@@ -140,7 +268,6 @@
   box-shadow: 0 0 0 1px var(--color-navy);
 }
 .att-event:focus-visible,
-.att-count:focus-visible,
 .att-date:focus-visible {
   outline: 3px solid color-mix(in srgb, var(--color-gold) 60%, transparent);
   outline-offset: 2px;
@@ -283,88 +410,6 @@
   color: var(--color-navy);
 }
 
-/* How-to-count link cards */
-.att-counts {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: 12px;
-}
-.att-count {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  min-height: 84px;
-  padding: 16px 18px;
-  border: 1px solid var(--color-line);
-  border-radius: 16px;
-  background: var(--color-surface);
-  color: var(--color-navy);
-  text-decoration: none;
-  transition: transform 0.12s ease, box-shadow 0.15s;
-}
-.att-count:hover {
-  color: var(--color-navy);
-  box-shadow: 0 8px 20px rgba(18, 32, 61, 0.08);
-}
-.att-count:active {
-  transform: scale(0.99);
-}
-.att-count-icon {
-  flex-shrink: 0;
-  width: 44px;
-  height: 44px;
-  border-radius: 12px;
-  background: var(--color-bg);
-  color: var(--color-navy);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.att-count-icon svg {
-  width: 22px;
-  height: 22px;
-}
-.att-count-text {
-  flex-grow: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
-}
-.att-count-title {
-  font-family: var(--font-display);
-  font-size: 1.125rem;
-  font-weight: 700;
-}
-.att-count-desc {
-  font-size: 0.8125rem;
-  color: var(--color-text-secondary);
-}
-.att-count-arrow {
-  flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  transform: rotate(180deg);
-}
-.att-count--primary {
-  border-color: var(--color-navy);
-  background: var(--color-navy);
-  color: var(--color-bg);
-}
-.att-count--primary:hover {
-  color: var(--color-bg);
-}
-.att-count--primary .att-count-icon {
-  background: rgba(247, 242, 231, 0.1);
-  color: var(--color-gold);
-}
-.att-count--primary .att-count-desc {
-  color: var(--color-navy-faint);
-}
-.att-count--primary .att-count-arrow {
-  color: var(--color-gold);
-}
-
 /* ===== Step 2: Check-in ===== */
 /* No bottom padding: the sticky progress bar is the page's last thing and owns that edge. */
 .page.att-page--checkin,
@@ -482,6 +527,21 @@
   flex-shrink: 0;
   height: 50px;
   border-radius: 12px !important;
+}
+/* Saved headcount total on the Congregation check-in's Headcount button. */
+.att-toolbar-count {
+  margin-left: 8px;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 11px;
+  background: var(--color-navy);
+  color: var(--color-bg);
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 /* Mobile: the walk-in button collapses to a 48px "+" icon button. */
 .att-walkin {
@@ -634,6 +694,87 @@
   font-family: inherit;
   font-size: 1rem;
 }
+/* "Undo check-in?" bubble — sits to the left of the button, inside the row, so the list's
+   overflow: hidden never clips it (even on the first or last row). */
+.att-toggle-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+}
+.att-undo-pop {
+  position: absolute;
+  top: 50%;
+  right: calc(100% + 10px);
+  z-index: 2;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 6px 6px 12px;
+  border-radius: 10px;
+  background: var(--color-navy);
+  color: var(--color-bg);
+  box-shadow: 0 8px 20px rgba(18, 32, 61, 0.18);
+  white-space: nowrap;
+  cursor: default;
+  animation: att-pop-in 0.14s ease-out;
+}
+/* Arrow pointing at the button. */
+.att-undo-pop::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  right: -5px;
+  width: 10px;
+  height: 10px;
+  background: var(--color-navy);
+  transform: translateY(-50%) rotate(45deg);
+}
+@keyframes att-pop-in {
+  from {
+    opacity: 0;
+    transform: translate(4px, -50%);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .att-undo-pop {
+    animation: none;
+  }
+}
+.att-undo-pop-text {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+.att-undo-pop-keep,
+.att-undo-pop-confirm {
+  position: relative;
+  z-index: 1;
+  height: 30px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 7px;
+  font-family: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.att-undo-pop-keep {
+  background: transparent;
+  color: var(--color-bg);
+}
+.att-undo-pop-keep:hover {
+  background: rgba(255, 255, 255, 0.12);
+}
+.att-undo-pop-confirm {
+  background: var(--color-danger);
+  color: #fff;
+}
+.att-undo-pop-keep:focus-visible,
+.att-undo-pop-confirm:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 1px;
+}
+
 .att-toggle {
   flex-shrink: 0;
   display: inline-flex;
@@ -699,6 +840,67 @@
   font-size: 0.875rem;
   color: var(--color-text-secondary);
 }
+/* "Details" breakdown by Life Group category (check-in bottom bar → modal). */
+.att-details-sub {
+  margin: 0 0 14px;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+.att-details-sub strong {
+  color: var(--color-navy);
+}
+.att-details {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.att-details-row {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+}
+.att-details-label {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+}
+.att-details-track {
+  display: block;
+  height: 8px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-navy) 8%, transparent);
+  overflow: hidden;
+}
+.att-details-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-gold);
+  transition: width 0.25s ease;
+}
+.att-details-count {
+  min-width: 64px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  font-size: 0.9375rem;
+  color: var(--color-navy);
+}
+.att-details-of {
+  color: var(--color-text-secondary);
+  font-size: 0.8125rem;
+}
+.att-details-row--muted .att-details-label {
+  color: var(--color-text-secondary);
+  font-weight: 500;
+}
+.att-details-row--muted .att-details-fill {
+  background: var(--color-line-strong);
+}
+
 .att-progress-count {
   font-family: var(--font-display);
   font-size: 1.375rem;
@@ -859,8 +1061,7 @@
   .att-setup-sub {
     display: block;
   }
-  .att-events,
-  .att-counts {
+  .att-events {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
   .att-dates {

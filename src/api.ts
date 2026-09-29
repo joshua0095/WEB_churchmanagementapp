@@ -694,7 +694,12 @@ export interface AttendancePerson {
   name: string;
   recordId: number | null;
   checkedInAt: string | null;
+  /** Life Group category as of the session date; null when birthday/gender are missing. */
+  category: LifeGroupAgeCategory | null;
 }
+
+/** The backend's CongregationCategory.ByLifeGroup labels. */
+export type LifeGroupAgeCategory = "Men" | "Women" | "YAN" | "KKB" | "Children";
 
 export interface AttendanceRoster {
   total: number;
@@ -708,6 +713,36 @@ export async function getAttendanceEvents(): Promise<AttendanceEvent[]> {
     throw new Error(`Failed to fetch events (${res.status})`);
   }
   return res.json();
+}
+
+export interface SaveEventInput {
+  name: string;
+  sundayOnly: boolean;
+  rosterScope: RosterScope;
+}
+
+export async function createAttendanceEvent(input: SaveEventInput): Promise<AttendanceEvent> {
+  const res = await apiFetch("/api/attendance/events", { method: "POST", body: JSON.stringify(input) });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to add event (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function updateAttendanceEvent(eventId: number, input: SaveEventInput): Promise<AttendanceEvent> {
+  const res = await apiFetch(`/api/attendance/events/${eventId}`, { method: "PUT", body: JSON.stringify(input) });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update event (${res.status})`);
+  }
+  return res.json();
+}
+
+/** Refused (409) once the event has any attendance recorded. */
+export async function deleteAttendanceEvent(eventId: number): Promise<void> {
+  const res = await apiFetch(`/api/attendance/events/${eventId}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to delete event (${res.status})`);
+  }
 }
 
 export async function setEventSundayOnly(eventId: number, sundayOnly: boolean): Promise<AttendanceEvent> {

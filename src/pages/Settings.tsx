@@ -3,9 +3,11 @@ import { createPortal } from "react-dom";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   addLifeGroupMember,
+  createAttendanceEvent,
   createLifeGroup,
   createMinistry,
   createNetwork,
+  deleteAttendanceEvent,
   deleteMinistry,
   deleteNetwork,
   getAttendanceEvents,
@@ -22,6 +24,7 @@ import {
   setEventRosterScope,
   setEventSundayOnly,
   setModuleAccessRule,
+  updateAttendanceEvent,
   updateLifeGroup,
   updateMinistry,
   updateNetwork,
@@ -36,6 +39,7 @@ import {
   type ModuleName,
   type Network,
   type RosterScope,
+  type SaveEventInput,
   type User,
 } from "../api";
 import { isAdmin } from "../auth";
@@ -89,6 +93,8 @@ const ROSTER_LABELS: Record<RosterScope, string> = {
 const ROSTER_OPTIONS: { value: RosterScope; label: string }[] = (Object.keys(ROSTER_LABELS) as RosterScope[]).map(
   (value) => ({ value, label: ROSTER_LABELS[value] }),
 );
+
+const emptyEventForm: SaveEventInput = { name: "", sundayOnly: false, rosterScope: "Congregation" };
 
 interface LeaderPickerProps {
   users: User[];
@@ -523,6 +529,11 @@ function Settings() {
   const [loadingEvents, setLoadingEvents] = useState(canManageAccess);
   const [eventsError, setEventsError] = useState<string | null>(null);
   const [savingEventId, setSavingEventId] = useState<number | null>(null);
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [editingEventId, setEditingEventId] = useState<number | null>(null);
+  const [eventForm, setEventForm] = useState<SaveEventInput>(emptyEventForm);
+  const [savingEvent, setSavingEvent] = useState(false);
+  const [eventFormError, setEventFormError] = useState<string | null>(null);
 
   const [lifeGroups, setLifeGroups] = useState<LifeGroupSummary[]>([]);
   const [loadingLifeGroups, setLoadingLifeGroups] = useState(canManageAccess);
@@ -685,6 +696,61 @@ function Settings() {
       setLifeGroupFormError(err instanceof Error ? err.message : "Failed to save life group");
     } finally {
       setSavingLifeGroup(false);
+    }
+  };
+
+  const openAddEvent = () => {
+    setEditingEventId(null);
+    setEventForm(emptyEventForm);
+    setEventFormError(null);
+    setEventModalOpen(true);
+  };
+
+  const openEditEvent = (event: AttendanceEvent) => {
+    setEditingEventId(event.id);
+    setEventForm({ name: event.name, sundayOnly: event.sundayOnly, rosterScope: event.rosterScope });
+    setEventFormError(null);
+    setEventModalOpen(true);
+  };
+
+  const handleSaveEvent = async () => {
+    const input = { ...eventForm, name: eventForm.name.trim() };
+    if (!input.name) return;
+    setSavingEvent(true);
+    setEventFormError(null);
+    try {
+      if (editingEventId === null) {
+        const created = await createAttendanceEvent(input);
+        setEvents((current) => [...current, created]);
+        successToast("Event added");
+      } else {
+        const updated = await updateAttendanceEvent(editingEventId, input);
+        setEvents((current) => current.map((e) => (e.id === updated.id ? updated : e)));
+        successToast("Event updated");
+      }
+      setEventModalOpen(false);
+    } catch (err) {
+      setEventFormError(err instanceof Error ? err.message : "Failed to save event");
+    } finally {
+      setSavingEvent(false);
+    }
+  };
+
+  const handleDeleteEvent = async (event: AttendanceEvent) => {
+    const confirmed = await confirmDialog({
+      title: "Delete event?",
+      message: `This permanently deletes "${event.name}". Events that already have attendance recorded can't be deleted.`,
+      confirmLabel: "Delete",
+      danger: true,
+    });
+    if (!confirmed) return;
+    setEventsError(null);
+    try {
+      await deleteAttendanceEvent(event.id);
+      setEvents((current) => current.filter((e) => e.id !== event.id));
+      successToast("Event deleted");
+    } catch (err) {
+      setEventsError(err instanceof Error ? err.message : "Failed to delete event");
     }
   };
 
@@ -932,8 +998,14 @@ function Settings() {
                   <div>
                     <h2 className="m-0 font-display text-xl font-semibold text-[var(--color-text-primary)]">Attendance events</h2>
                     <p className="m-0 mt-1 text-sm text-[var(--color-text-secondary)]">
-                      Set who can be checked in for each event, and whether it only happens on Sundays.
+                      The events you can take attendance for — who can be checked in for each, and whether it only
+                      happens on Sundays.
                     </p>
+                  </div>
+                  <div className="settings-head-actions">
+                    <Button type="button" onClick={openAddEvent}>
+                      + Add event
+                    </Button>
                   </div>
                 </div>
                 <div className="settings-thead settings-cols-attendance">
@@ -947,10 +1019,25 @@ function Settings() {
                     <Skeleton className="h-10 w-full" />
                     <Skeleton className="h-10 w-full" />
                   </div>
+                ) : events.length === 0 ? (
+                  <p className="px-7 py-6 text-sm text-[var(--color-text-secondary)]">
+                    No events yet. Add one to start taking attendance for it.
+                  </p>
                 ) : (
                   events.map((event) => (
                     <div key={event.id} className="settings-trow settings-cols-attendance settings-att-row">
-                      <span className="settings-event-name">{event.name}</span>
+                      <div className="settings-event-head">
+                        <span className="settings-event-name">{event.name}</span>
+                        <DropdownMenu
+                          icon={<KebabIcon />}
+                          triggerClassName="settings-kebab"
+                          ariaLabel={`Actions for ${event.name}`}
+                          items={[
+                            { label: "Edit", onSelect: () => openEditEvent(event) },
+                            { label: "Delete", onSelect: () => void handleDeleteEvent(event) },
+                          ]}
+                        />
+                      </div>
                       <SegmentedControl
                         aria-label={`Roster for ${event.name}`}
                         options={ROSTER_OPTIONS}
@@ -1243,6 +1330,59 @@ function Settings() {
             ))}
           </SelectField>
           {ministryFormError && <p className="error">{ministryFormError}</p>}
+        </div>
+      </Modal>
+
+      <Modal
+        open={eventModalOpen}
+        onClose={() => setEventModalOpen(false)}
+        title={editingEventId === null ? "Add event" : "Edit event"}
+        footer={
+          <>
+            <Button type="button" variant="secondary" onClick={() => setEventModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={handleSaveEvent} disabled={savingEvent || !eventForm.name.trim()}>
+              {savingEvent ? "Saving..." : editingEventId === null ? "Add" : "Save changes"}
+            </Button>
+          </>
+        }
+      >
+        <div className="flex flex-col gap-4">
+          <TextField
+            label="Event name"
+            value={eventForm.name}
+            onChange={(e) => setEventForm((f) => ({ ...f, name: e.target.value }))}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleSaveEvent();
+            }}
+            placeholder="e.g. Prayer Meeting"
+            maxLength={100}
+            autoFocus
+            required
+          />
+          <div className="flex flex-col gap-2">
+            <span className="text-sm font-semibold text-[var(--color-text-primary)]">Roster</span>
+            <SegmentedControl
+              aria-label="Roster"
+              options={ROSTER_OPTIONS}
+              value={eventForm.rosterScope}
+              onChange={(value) => setEventForm((f) => ({ ...f, rosterScope: value }))}
+            />
+            <span className="text-xs text-[var(--color-text-secondary)]">Which check-in list the event accepts.</span>
+          </div>
+          <label className="flex items-center justify-between gap-4">
+            <span className="flex flex-col">
+              <span className="text-sm font-semibold text-[var(--color-text-primary)]">Sunday only</span>
+              <span className="text-xs text-[var(--color-text-secondary)]">The date picker allows Sundays only.</span>
+            </span>
+            <Switch
+              checked={eventForm.sundayOnly}
+              onChange={() => setEventForm((f) => ({ ...f, sundayOnly: !f.sundayOnly }))}
+              aria-label="Sunday only"
+            />
+          </label>
+          {eventFormError && <p className="error">{eventFormError}</p>}
         </div>
       </Modal>
 

@@ -4,7 +4,8 @@ import { Modal, useToast } from "../dialogs";
 import { AppShell, Button, ProfileMenu, TextField } from "../ui";
 import { BackIcon, CalendarIcon } from "../ui/icons";
 import { CheckThinIcon, TopbarSearchIcon } from "../ui/shellIcons";
-import { formatLongDate, formatShortDate, initials } from "./attendanceFlow";
+import type { LifeGroupAgeCategory } from "../../api";
+import { formatLongDate, formatWeekdayMonthDay, initials } from "./attendanceFlow";
 
 export interface CheckInPerson {
   id: number;
@@ -13,6 +14,9 @@ export interface CheckInPerson {
   checkedInAt: string | null;
   /** Life Group members only — undefined for event rosters. */
   firstTimer?: boolean;
+  /** Event rosters only — undefined for Life Groups, whose members have no birthday/gender.
+   * null means the person couldn't be classified. */
+  category?: LifeGroupAgeCategory | null;
 }
 
 export interface CheckInRoster {
@@ -56,6 +60,9 @@ type Filter = "all" | "pending" | "checked";
 // checked in, but can't be undone until the real id comes back.
 const PENDING_RECORD_ID = -1;
 
+// Display order for the "Details" breakdown — adults first, then down by age.
+const CATEGORY_ORDER: LifeGroupAgeCategory[] = ["Men", "Women", "YAN", "KKB", "Children"];
+
 // Matches the app shell's lg breakpoint (see attendance.css / ui.css).
 const DESKTOP_QUERY = "(min-width: 1024px)";
 
@@ -98,8 +105,12 @@ function CheckInScreen({
   const [query, setQuery] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [editingRecordId, setEditingRecordId] = useState<number | null>(null);
+  // Person whose "Undo check-in?" bubble is open — at most one at a time.
+  const [confirmUndoId, setConfirmUndoId] = useState<number | null>(null);
+  const undoConfirmRef = useRef<HTMLSpanElement>(null);
   const [timeInput, setTimeInput] = useState("");
   const [walkInOpen, setWalkInOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [walkInName, setWalkInName] = useState("");
   const [walkInFirstTimer, setWalkInFirstTimer] = useState(false);
   const [walkInSubmitting, setWalkInSubmitting] = useState(false);
@@ -127,6 +138,24 @@ function CheckInScreen({
   const checkedCount = roster?.checkedInCount ?? 0;
   const total = roster?.total ?? 0;
 
+  // Checked in / on the list per Life Group category, for the "Details" view. Only event
+  // rosters carry a category (Life Group members have no birthday/gender), so it's null there.
+  const breakdown = useMemo(() => {
+    if (people.length === 0 || people.every((p) => p.category === undefined)) return null;
+    const rows: { label: string; checked: number; total: number; muted?: boolean }[] = [
+      ...CATEGORY_ORDER.map((label) => ({ label, checked: 0, total: 0 })),
+      { label: "Not classified", checked: 0, total: 0, muted: true },
+    ];
+    for (const p of people) {
+      const index = p.category ? CATEGORY_ORDER.indexOf(p.category) : -1;
+      const row = rows[index >= 0 ? index : rows.length - 1];
+      row.total++;
+      if (p.recordId) row.checked++;
+    }
+    // "Not classified" only earns a line when someone falls into it.
+    return rows.filter((r) => !r.muted || r.total > 0);
+  }, [people]);
+
   const visiblePeople = useMemo(() => {
     const q = query.trim().toLowerCase();
     return people.filter((p) => {
@@ -147,6 +176,30 @@ function CheckInScreen({
         },
     );
   };
+
+  // Checking in is one tap; undoing asks first via a small bubble beside the button, since
+  // a stray tap on a long list is easy.
+  const requestToggle = (person: CheckInPerson) => {
+    if (person.recordId) setConfirmUndoId((current) => (current === person.id ? null : person.id));
+    else void toggle(person);
+  };
+
+  useEffect(() => {
+    if (confirmUndoId === null) return;
+    undoConfirmRef.current?.querySelector<HTMLButtonElement>(".att-undo-pop-confirm")?.focus();
+    const onPointerDown = (e: PointerEvent) => {
+      if (!undoConfirmRef.current?.contains(e.target as Node)) setConfirmUndoId(null);
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setConfirmUndoId(null);
+    };
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [confirmUndoId]);
 
   const toggle = async (person: CheckInPerson) => {
     if (pending.current.has(person.id)) return;
@@ -252,7 +305,7 @@ function CheckInScreen({
       pageClassName="att-page att-page--checkin"
       mobileFocus={{
         title,
-        subtitle: `${rosterLabel} · ${formatShortDate(date)}`,
+        subtitle: `${rosterLabel} · ${formatWeekdayMonthDay(date)}`,
         onBack: () => navigate(backUrl),
         backLabel: "Back to attendance setup",
       }}
@@ -348,6 +401,7 @@ function CheckInScreen({
               {visiblePeople.map((person) => {
                 const checked = !!person.recordId;
                 const editing = editingRecordId !== null && editingRecordId === person.recordId;
+                const confirmingUndo = checked && confirmUndoId === person.id;
                 return (
                   <li
                     key={person.id}
@@ -358,7 +412,7 @@ function CheckInScreen({
                         : () => {
                             // Whole-row tap is a mobile touch target; on desktop only the button toggles.
                             if (window.matchMedia(DESKTOP_QUERY).matches) return;
-                            void toggle(person);
+                            requestToggle(person);
                           }
                     }
                   >
@@ -406,25 +460,51 @@ function CheckInScreen({
                         <span className="att-row-status">Not checked in yet</span>
                       )}
                     </div>
-                    <button
-                      type="button"
-                      className="att-toggle"
-                      aria-pressed={checked}
-                      aria-label={checked ? `${person.name} is checked in — tap to undo` : `Check in ${person.name}`}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void toggle(person);
-                      }}
-                    >
-                      {checked ? (
-                        <>
-                          <CheckThinIcon strokeWidth={2.6} />
-                          Checked in
-                        </>
-                      ) : (
-                        "Check in"
+                    <span className="att-toggle-wrap" ref={confirmingUndo ? undoConfirmRef : undefined}>
+                      {confirmingUndo && (
+                        <span
+                          className="att-undo-pop"
+                          role="dialog"
+                          aria-label={`Undo ${person.name}'s check-in?`}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <span className="att-undo-pop-text">Undo check-in?</span>
+                          <button type="button" className="att-undo-pop-keep" onClick={() => setConfirmUndoId(null)}>
+                            Keep
+                          </button>
+                          <button
+                            type="button"
+                            className="att-undo-pop-confirm"
+                            onClick={() => {
+                              setConfirmUndoId(null);
+                              void toggle(person);
+                            }}
+                          >
+                            Undo
+                          </button>
+                        </span>
                       )}
-                    </button>
+                      <button
+                        type="button"
+                        className="att-toggle"
+                        aria-pressed={checked}
+                        aria-expanded={checked ? confirmingUndo : undefined}
+                        aria-label={checked ? `${person.name} is checked in — tap to undo` : `Check in ${person.name}`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          requestToggle(person);
+                        }}
+                      >
+                        {checked ? (
+                          <>
+                            <CheckThinIcon strokeWidth={2.6} />
+                            Checked in
+                          </>
+                        ) : (
+                          "Check in"
+                        )}
+                      </button>
+                    </span>
                   </li>
                 );
               })}
@@ -433,8 +513,15 @@ function CheckInScreen({
 
           <div className="att-bottom-bar">
             <div className="att-progress">
-              <span className="att-progress-text" aria-live="polite">
-                <span className="att-progress-count">{checkedCount}</span> of {total} checked in
+              <span className="att-progress-text">
+                <span aria-live="polite">
+                  <span className="att-progress-count">{checkedCount}</span> of {total} checked in
+                </span>
+                {breakdown && (
+                  <button type="button" className="att-link att-link--small" onClick={() => setDetailsOpen(true)}>
+                    Details
+                  </button>
+                )}
               </span>
               <span className="att-progress-track" aria-hidden="true">
                 <span className="att-progress-fill" style={{ width: `${total ? Math.min(100, (checkedCount / total) * 100) : 0}%` }} />
@@ -445,6 +532,32 @@ function CheckInScreen({
             </Button>
           </div>
         </>
+      )}
+
+      {breakdown && (
+        <Modal open={detailsOpen} onClose={() => setDetailsOpen(false)} size="sm" title="Attendance details">
+          <p className="att-details-sub">
+            <strong>{checkedCount}</strong> of {total} checked in · {formatWeekdayMonthDay(date)}
+          </p>
+          <ul className="att-details">
+            {breakdown.map((row) => (
+              <li key={row.label} className={["att-details-row", row.muted && "att-details-row--muted"].filter(Boolean).join(" ")}>
+                <span className="att-details-label">{row.label}</span>
+                <span className="att-details-track" aria-hidden="true">
+                  <span className="att-details-fill" style={{ width: `${checkedCount ? (row.checked / checkedCount) * 100 : 0}%` }} />
+                </span>
+                <span className="att-details-count">
+                  <strong>{row.checked}</strong>
+                  <span className="att-details-of"> / {row.total}</span>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <p className="att-note">
+            Grouped by each person's birthday and gender as of this date — the same rules as the monthly report.
+            "Not classified" means a birthday or gender is missing.
+          </p>
+        </Modal>
       )}
 
       {walkIn && (

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useParams, useSearchParams } from "react-router-dom";
 import {
   addWalkIn,
   checkInAttendance,
@@ -14,18 +14,24 @@ import {
 } from "../api";
 import {
   ROSTER_LABELS,
-  headcountUrl,
   isValidIsoDate,
   setupUrl,
   type RosterKind,
 } from "../components/attendance/attendanceFlow";
 import CheckInScreen, { type CheckInRoster } from "../components/attendance/CheckInScreen";
+import { HeadcountButton } from "../components/attendance/HeadcountModal";
 
 function toCheckInRoster(roster: AttendanceRoster): CheckInRoster {
   return {
     total: roster.total,
     checkedInCount: roster.checkedInCount,
-    people: roster.people.map((p) => ({ id: p.personId, name: p.name, recordId: p.recordId, checkedInAt: p.checkedInAt })),
+    people: roster.people.map((p) => ({
+      id: p.personId,
+      name: p.name,
+      recordId: p.recordId,
+      checkedInAt: p.checkedInAt,
+      category: p.category,
+    })),
   };
 }
 
@@ -48,7 +54,6 @@ function AttendanceCheckIn() {
 
   const [event, setEvent] = useState<AttendanceEvent | null>(null);
   const [sessionId, setSessionId] = useState<number | null>(null);
-  const [headcountOnly, setHeadcountOnly] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -63,8 +68,7 @@ function AttendanceCheckIn() {
           return;
         }
         setEvent(found);
-        if (session.trackingType === "Headcount") setHeadcountOnly(true);
-        else setSessionId(session.id);
+        setSessionId(session.id);
       })
       .catch((err) => {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to open attendance");
@@ -82,22 +86,18 @@ function AttendanceCheckIn() {
     return toCheckInRoster(data);
   }, [sessionId, roster]);
 
-  const backUrl = setupUrl({ event: validParams ? eventId : null, date: validParams ? date : null });
+  const backUrl = setupUrl({
+    event: validParams ? eventId : null,
+    date: validParams ? date : null,
+    // A Workers & Congregation event asks for the list on the setup page, so keep it.
+    roster: event?.rosterScope === "Both" ? roster : null,
+  });
 
   let blocker = null;
   if (!validParams) {
     blocker = <div className="att-empty"><p>This link is missing its event or date.</p></div>;
   } else if (error) {
     blocker = <div className="att-empty"><p>{error}</p></div>;
-  } else if (headcountOnly) {
-    blocker = (
-      <div className="att-empty">
-        <p>This date is already being counted by headcount, so names can't be checked in for it.</p>
-        <Link className="att-empty-action" to={headcountUrl(eventId, date)}>
-          Go to headcount
-        </Link>
-      </div>
-    );
   }
 
   return (
@@ -121,6 +121,7 @@ function AttendanceCheckIn() {
             }
           : undefined
       }
+      toolbarExtra={roster === "congregation" && sessionId !== null ? () => <HeadcountButton sessionId={sessionId} /> : undefined}
     />
   );
 }

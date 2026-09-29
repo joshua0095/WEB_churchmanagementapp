@@ -44,6 +44,22 @@ export function formatShortDate(iso: string): string {
   return `${weekday} ${d.getDate()} ${month}`;
 }
 
+/** "Sunday" */
+export function formatWeekday(iso: string): string {
+  return parseIso(iso).toLocaleDateString("en-US", { weekday: "long" });
+}
+
+/** "September 27" */
+export function formatMonthDay(iso: string): string {
+  const d = parseIso(iso);
+  return `${d.toLocaleDateString("en-US", { month: "long" })} ${d.getDate()}`;
+}
+
+/** "Sunday September 27" */
+export function formatWeekdayMonthDay(iso: string): string {
+  return `${formatWeekday(iso)} ${formatMonthDay(iso)}`;
+}
+
 /** "Sunday, 27 September 2026" */
 export function formatLongDate(iso: string): string {
   const d = parseIso(iso);
@@ -86,10 +102,16 @@ export function relativeDayLabel(iso: string): string {
 
 // ---------- URLs ----------
 
-export function setupUrl(params: { event?: string | number | null; date?: string | null; group?: number | null }): string {
+export function setupUrl(params: {
+  event?: string | number | null;
+  date?: string | null;
+  group?: number | null;
+  roster?: RosterKind | null;
+}): string {
   const search = new URLSearchParams();
   if (params.event != null) search.set("event", String(params.event));
   if (params.group != null) search.set("group", String(params.group));
+  if (params.roster) search.set("roster", params.roster);
   if (params.date) search.set("date", params.date);
   const qs = search.toString();
   return qs ? `/attendance?${qs}` : "/attendance";
@@ -109,7 +131,6 @@ export function lifeGroupCheckInUrl(groupId: number, date: string): string {
 
 // ---------- Remembered selection ----------
 
-const LAST_EVENT_KEY = "attendance:lastEvent";
 const LAST_GROUP_KEY = "attendance:lastLifeGroup";
 
 function readStorage(key: string): string | null {
@@ -124,16 +145,8 @@ function writeStorage(key: string, value: string): void {
   try {
     localStorage.setItem(key, value);
   } catch {
-    // Private mode / blocked storage — remembering the last event is just a convenience.
+    // Private mode / blocked storage — remembering the last life group is just a convenience.
   }
-}
-
-export function getLastEvent(): string | null {
-  return readStorage(LAST_EVENT_KEY);
-}
-
-export function setLastEvent(event: string | number): void {
-  writeStorage(LAST_EVENT_KEY, String(event));
 }
 
 export function getLastLifeGroup(): number | null {
