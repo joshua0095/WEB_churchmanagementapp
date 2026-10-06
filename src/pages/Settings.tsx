@@ -1017,7 +1017,7 @@ function Settings() {
                       >
                         {versions.map((v) => (
                           <option key={v.id} value={v.id}>
-                            {v.title} ({v.abbreviation})
+                            {v.title}
                           </option>
                         ))}
                       </select>

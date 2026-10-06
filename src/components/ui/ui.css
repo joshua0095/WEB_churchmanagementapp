@@ -1492,67 +1492,6 @@
   height: 18px;
 }
 
-.home-theme {
-  order: -1; /* theme card comes first when stacked */
-  position: relative;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 32px 24px;
-  border-radius: 20px;
-  background: var(--color-navy);
-  text-align: center;
-  isolation: isolate;
-}
-.home-theme::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  background: radial-gradient(circle at 50% 50%, rgba(217, 163, 42, 0.2) 0%, rgba(217, 163, 42, 0) 62%);
-}
-.home-theme-label {
-  margin: 0;
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: #c3ccdd;
-}
-.home-theme-keyword {
-  margin: 18px 0 8px;
-  /* Letter-spacing adds trailing space after the last letter; pad the start to re-center. */
-  padding-left: 0.3em;
-  font-family: var(--font-display);
-  font-size: 14px;
-  font-weight: 600;
-  letter-spacing: 0.3em;
-  text-transform: uppercase;
-  color: var(--color-gold);
-}
-.home-theme-title {
-  font-family: var(--font-display);
-  font-weight: 600;
-  font-size: 28px;
-  line-height: 1.15;
-  color: var(--color-cream);
-}
-.home-theme-divider {
-  display: block;
-  width: 40px;
-  height: 2px;
-  margin: 18px 0;
-  background: var(--color-gold);
-}
-.home-theme-verses {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #c3ccdd;
-}
-
 /* 3. Your walk today */
 .home-walk-title {
   margin: 0 0 14px;
@@ -1682,16 +1621,6 @@
   }
   .home-announce-title {
     font-size: 28px;
-  }
-  .home-theme {
-    order: 0;
-    padding: 36px 32px;
-  }
-  .home-theme-title {
-    font-size: 34px;
-  }
-  .home-theme-label {
-    letter-spacing: 0.22em;
   }
 
   .home-walk-grid--2 {

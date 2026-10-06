@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { MoreIcon } from "./icons";
 
@@ -25,6 +25,16 @@ interface DropdownMenuProps {
 }
 
 const MENU_WIDTH = 190;
+const GAP = 4;
+const EDGE = 8;
+
+/** Bottom of the usable viewport — the top of the mobile tab bar when it's showing. */
+function usableBottom(): number {
+  // A hidden nav (desktop, or display:none) measures 0×0.
+  const navRect = document.querySelector<HTMLElement>(".app-bottom-nav")?.getBoundingClientRect();
+  const navTop = navRect && navRect.height > 0 ? navRect.top : window.innerHeight;
+  return Math.min(window.innerHeight, navTop) - EDGE;
+}
 
 /**
  * Three-dot "more actions" menu. Closes on an outside click or after picking an item.
@@ -41,13 +51,24 @@ function DropdownMenu({ items, ariaLabel, icon, triggerClassName }: DropdownMenu
   const buttonRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (!open) return;
+  // Layout effect: the menu is already in the DOM (hidden) on the first pass, so its real
+  // height can be measured and it can flip above the trigger before it's ever painted.
+  useLayoutEffect(() => {
+    if (!open) {
+      setPosition(null);
+      return;
+    }
 
     const updatePosition = () => {
       const rect = buttonRef.current?.getBoundingClientRect();
       if (!rect) return;
-      setPosition({ top: rect.bottom + 4, left: rect.right - MENU_WIDTH });
+      const menuHeight = menuRef.current?.offsetHeight ?? 0;
+      const below = rect.bottom + GAP;
+      // Opens downward unless that would run off the screen (or under the tab bar) and there's more room above.
+      const fitsBelow = below + menuHeight <= usableBottom();
+      const top = fitsBelow || rect.top - GAP - menuHeight < EDGE ? below : rect.top - GAP - menuHeight;
+      const left = Math.min(Math.max(EDGE, rect.right - MENU_WIDTH), window.innerWidth - MENU_WIDTH - EDGE);
+      setPosition({ top, left });
     };
     updatePosition();
 
@@ -87,12 +108,17 @@ function DropdownMenu({ items, ariaLabel, icon, triggerClassName }: DropdownMenu
         {icon ?? <MoreIcon />}
       </button>
       {open &&
-        position &&
         createPortal(
           <div
             ref={menuRef}
             role="menu"
-            style={{ position: "fixed", top: position.top, left: position.left, width: MENU_WIDTH }}
+            style={{
+              position: "fixed",
+              top: position?.top ?? 0,
+              left: position?.left ?? 0,
+              width: MENU_WIDTH,
+              visibility: position ? "visible" : "hidden",
+            }}
             className="z-50 overflow-hidden rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] py-1 shadow-lg"
           >
             {items.map((item) => (

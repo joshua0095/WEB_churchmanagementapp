@@ -1,0 +1,1042 @@
+/* ---------- Announcements page, its modals, and the Home theme card/notice ----------
+   Mobile-first (<1024px), matching announcements-mobile.png; ≥1024px matches the desktop
+   page and the two-column modals. */
+
+/* ===== Home: theme-of-the-month poster card ===== */
+.home-theme {
+  order: -1; /* theme card comes first when stacked */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid rgba(18, 32, 61, 0.08);
+  border-radius: 20px;
+}
+.home-theme-poster {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--color-navy);
+}
+.home-theme-poster img {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.home-theme-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+}
+.home-theme-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: #9a6f10;
+}
+.home-theme-month {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* ===== Home: announcement card additions ===== */
+/* A steady height, so paging between text and image announcements doesn't make the card jump. */
+.home-announce {
+  min-height: 280px;
+}
+
+/* Image announcements: the image fills the whole card. The text and controls stay in the
+   layout (so the card keeps its size) but are hidden until hover / keyboard focus / a tap,
+   when they fade in over a navy gradient. */
+.home-announce--image {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+  /* No border or card colour: either would show as a dark frame around the image (the 1px
+     border sits outside the area the image covers, and the background peeks out at the
+     rounded corners). The overlay gradient supplies the dark tone on hover. */
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.home-announce-cover {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+}
+.home-announce-cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transition: transform 400ms ease;
+}
+.home-announce-cover::before,
+.home-announce-cover::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  pointer-events: none;
+}
+.home-announce-cover::after {
+  background: linear-gradient(0deg, rgba(18, 32, 61, 0.95) 0%, rgba(18, 32, 61, 0.72) 50%, rgba(18, 32, 61, 0.5) 100%);
+}
+.home-announce--image > .home-announce-head,
+.home-announce--image > .home-announce-body,
+.home-announce--image > .home-announce-foot {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 200ms ease;
+}
+
+/* Revealed: keyboard focus inside the card, a tap (touch), or hover (mouse — below). */
+.home-announce--image:focus-within .home-announce-cover::after,
+.home-announce--revealed .home-announce-cover::after {
+  opacity: 1;
+}
+.home-announce--image:focus-within > *,
+.home-announce--revealed > * {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+@media (hover: hover) {
+  .home-announce--image:hover .home-announce-cover::after {
+    opacity: 1;
+  }
+  .home-announce--image:hover .home-announce-cover img {
+    transform: scale(1.03);
+  }
+  .home-announce--image:hover > * {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+  }
+}
+/* Touch screens can't hover: keep the prev/next controls showing over a bottom fade, and a
+   tap on the image brings up the details. */
+@media (hover: none) {
+  .home-announce-cover::before {
+    top: auto;
+    height: 45%;
+    opacity: 1;
+    background: linear-gradient(0deg, rgba(18, 32, 61, 0.85) 0%, rgba(18, 32, 61, 0) 100%);
+  }
+  .home-announce--image > .home-announce-foot {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+/* Light-on-dark text and controls over the image */
+.home-announce--image .home-eyebrow {
+  color: var(--color-gold);
+}
+.home-announce--image .home-link {
+  color: var(--color-cream);
+}
+.home-announce--image .home-announce-date,
+.home-announce--image .home-announce-excerpt {
+  color: #c3ccdd;
+}
+.home-announce--image .home-announce-title {
+  color: var(--color-cream);
+}
+.home-announce--image .home-btn--outline,
+.home-announce--image .home-round-btn {
+  border-color: rgba(247, 242, 231, 0.4);
+  background: rgba(247, 242, 231, 0.1);
+  color: var(--color-cream);
+  backdrop-filter: blur(4px);
+}
+.home-announce--image .home-btn--outline:hover,
+.home-announce--image .home-round-btn:hover {
+  background: rgba(247, 242, 231, 0.2);
+}
+.home-announce--image .home-round-btn--solid,
+.home-announce--image .home-round-btn--solid:hover {
+  border-color: var(--color-cream);
+  background: var(--color-cream);
+  color: var(--color-navy);
+}
+.home-announce--image .home-dot {
+  background: rgba(247, 242, 231, 0.4);
+}
+.home-announce--image .home-dot--active {
+  background: var(--color-gold);
+}
+
+/* Title, details, then the date (when it has one). */
+.home-announce-title + .home-announce-date,
+.home-announce-excerpt + .home-announce-date {
+  margin-top: 12px;
+}
+.home-link--static {
+  cursor: default;
+}
+
+/* ===== Home: "theme isn't set" admin notice ===== */
+.theme-notice {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 44px;
+  grid-template-areas:
+    "icon text close"
+    "btn btn btn";
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 14px 10px 14px 14px;
+  background: #f1e7cf;
+  border: 1px solid rgba(154, 111, 16, 0.28);
+  border-radius: 14px;
+}
+.theme-notice-icon {
+  grid-area: icon;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--color-gold);
+  color: var(--color-navy);
+}
+.theme-notice-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.theme-notice-text {
+  grid-area: text;
+  min-width: 0;
+}
+.theme-notice-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--color-navy);
+}
+.theme-notice-msg {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--color-text-secondary);
+}
+.theme-notice-btn {
+  grid-area: btn;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  margin-right: 4px;
+  padding: 0 18px;
+  border: none;
+  border-radius: 12px;
+  background: var(--color-navy);
+  color: var(--color-cream);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.theme-notice-btn svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-gold);
+}
+.theme-notice-btn:hover {
+  background: var(--color-navy-mid);
+}
+.theme-notice-close {
+  grid-area: close;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  cursor: pointer;
+}
+.theme-notice-close:hover {
+  background: rgba(18, 32, 61, 0.06);
+  color: var(--color-navy);
+}
+.theme-notice-close svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* ===== Announcements page ===== */
+.ann-page {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.ann-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.ann-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.1;
+  color: var(--color-navy);
+}
+.ann-subtitle {
+  display: none;
+  margin: 6px 0 0;
+  font-size: 15px;
+  color: var(--color-text-secondary);
+}
+.ann-new-long,
+.ann-section-note-long {
+  display: none;
+}
+.ann-section-head {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  margin-bottom: 14px;
+}
+.ann-section-title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 19px;
+  color: var(--color-navy);
+}
+.ann-section-note {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* Buttons */
+.ann-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background 150ms,
+    border-color 150ms;
+}
+.ann-btn svg {
+  width: 17px;
+  height: 17px;
+  flex-shrink: 0;
+}
+.ann-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.ann-btn--gold {
+  background: var(--color-gold);
+  color: var(--color-navy);
+}
+.ann-btn--gold:hover:not(:disabled) {
+  background: var(--color-gold-hover);
+}
+.ann-btn--outline {
+  background: var(--color-surface);
+  border-color: rgba(18, 32, 61, 0.16);
+  color: var(--color-navy);
+}
+.ann-btn--outline:hover:not(:disabled) {
+  background: var(--color-bg-soft);
+  border-color: rgba(18, 32, 61, 0.28);
+}
+.ann-btn--sm {
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 14px;
+}
+.ann-btn--grow {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.ann-new-btn {
+  flex-shrink: 0;
+}
+.ann-text-danger {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--color-danger);
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ann-text-danger svg {
+  width: 16px;
+  height: 16px;
+}
+.ann-btn:focus-visible,
+.ann-text-danger:focus-visible,
+.ann-kebab:focus-visible,
+.ann-new-tile:focus-visible,
+.ann-drop:focus-visible,
+.theme-notice-btn:focus-visible,
+.theme-notice-close:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--color-gold) 60%, transparent);
+  outline-offset: 2px;
+}
+
+/* Chips */
+.ann-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.ann-chip svg {
+  width: 12px;
+  height: 12px;
+}
+.ann-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+.ann-chip--gold {
+  background: var(--color-gold);
+  color: var(--color-navy);
+}
+.ann-chip--soft {
+  background: #f6ebcf;
+  color: #9a6f10;
+}
+.ann-chip--success {
+  background: #e3f1e9;
+  color: var(--color-success);
+}
+.ann-chip--danger {
+  background: #fbe9e7;
+  color: var(--color-danger);
+}
+
+/* Monthly theme row */
+.ann-theme-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.ann-theme-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid rgba(18, 32, 61, 0.08);
+  border-radius: 16px;
+}
+.ann-theme-poster {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: var(--color-navy);
+}
+.ann-theme-poster img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ann-theme-chip {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+}
+.ann-theme-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px 14px 16px;
+}
+.ann-theme-month {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-navy);
+}
+.ann-theme-name {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.ann-theme-card--empty {
+  align-items: flex-start;
+  justify-content: center;
+  gap: 10px;
+  padding: 22px 20px;
+  background: transparent;
+  border: 1.5px dashed rgba(18, 32, 61, 0.2);
+}
+.ann-theme-empty-title {
+  margin-top: 4px;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 22px;
+  color: var(--color-navy);
+}
+.ann-theme-empty-text {
+  margin: 0;
+  max-width: 46ch;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+.ann-theme-card--empty .ann-btn {
+  align-self: stretch;
+  margin-top: 6px;
+}
+
+/* Announcement cards */
+.ann-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+.ann-card {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid rgba(18, 32, 61, 0.08);
+  border-radius: 16px;
+}
+.ann-card-preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--color-navy);
+}
+.ann-card-preview--text {
+  background:
+    radial-gradient(circle at 82% 18%, rgba(217, 163, 42, 0.3) 0%, rgba(217, 163, 42, 0) 55%),
+    var(--color-navy);
+}
+.ann-card-ribbon {
+  position: absolute;
+  top: 0;
+  left: 20px;
+  width: 12px;
+  height: 30px;
+  background: var(--color-gold);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 78%, 0 100%);
+}
+.ann-card-preview-text {
+  position: absolute;
+  right: 18px;
+  bottom: 16px;
+  left: 18px;
+}
+.ann-card-preview-date {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c3ccdd;
+}
+.ann-card-preview-title {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  overflow: hidden;
+  margin: 4px 0 0;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 22px;
+  line-height: 1.2;
+  color: var(--color-cream);
+}
+.ann-card-preview--image img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ann-image-tag {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 9px;
+  border-radius: 8px;
+  background: rgba(18, 32, 61, 0.78);
+  color: var(--color-cream);
+  font-size: 12px;
+  font-weight: 600;
+}
+.ann-image-tag svg {
+  width: 14px;
+  height: 14px;
+}
+.ann-card-body {
+  flex-grow: 1;
+  padding: 14px 16px 4px;
+}
+.ann-card-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--color-navy);
+}
+.ann-card-title--none {
+  font-style: italic;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+.ann-card-meta {
+  margin: 2px 0 10px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+.ann-card-foot {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px 16px;
+}
+.ann-kebab {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-left: auto;
+  border: 1px solid rgba(18, 32, 61, 0.16);
+  border-radius: 12px;
+  background: var(--color-surface);
+  color: var(--color-navy);
+  cursor: pointer;
+}
+.ann-kebab:hover {
+  background: var(--color-bg-soft);
+}
+.ann-kebab svg {
+  width: 20px;
+  height: 20px;
+}
+.ann-new-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-height: 180px;
+  padding: 24px;
+  border: 1.5px dashed rgba(18, 32, 61, 0.2);
+  border-radius: 16px;
+  background: transparent;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 150ms;
+}
+.ann-new-tile:hover {
+  background: rgba(255, 255, 255, 0.55);
+}
+.ann-new-tile-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 8px;
+  border-radius: 50%;
+  background: var(--color-navy);
+  color: var(--color-gold);
+}
+.ann-new-tile-icon svg {
+  width: 22px;
+  height: 22px;
+}
+.ann-new-tile-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--color-navy);
+}
+.ann-new-tile-hint {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+/* ===== Modals: two columns (fields | Preview on Home) ===== */
+.modal-body.ann-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
+  padding: 0;
+  border-top: 1px solid var(--color-line);
+}
+.ann-split-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 24px 20px;
+}
+.ann-split-preview {
+  padding: 20px 24px 24px;
+  background: var(--color-bg);
+  border-top: 1px solid var(--color-line);
+}
+.ann-preview-label {
+  margin: 0 0 12px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--color-text-secondary);
+}
+.ann-preview-card {
+  padding: 20px;
+  pointer-events: none;
+}
+.ann-preview-card .home-announce-title {
+  font-size: 24px;
+}
+.ann-preview-card--sample {
+  opacity: 0.7;
+}
+.ann-preview-note {
+  margin: 12px 0 0;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--color-text-secondary);
+}
+.ann-preview-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16 / 9;
+  padding: 20px;
+  border: 1.5px dashed rgba(18, 32, 61, 0.2);
+  border-radius: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.ann-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.ann-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--color-navy);
+}
+.ann-label-hint {
+  font-weight: 400;
+  color: var(--color-text-secondary);
+}
+.modal-body .ann-input,
+.ann-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid rgba(18, 32, 61, 0.16);
+  border-radius: 10px;
+  background: var(--color-surface);
+  color: var(--color-navy);
+  font-family: inherit;
+  font-size: 15px;
+}
+.ann-input:focus {
+  border-color: var(--color-navy);
+  outline: 3px solid color-mix(in srgb, var(--color-gold) 35%, transparent);
+  outline-offset: 0;
+}
+.ann-input--date {
+  max-width: 240px;
+}
+.modal-body textarea.ann-textarea {
+  height: auto;
+  min-height: 104px;
+  padding: 12px 14px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.ann-hint {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--color-text-secondary);
+}
+.ann-field-error {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-danger);
+}
+
+/* Drop zone */
+.ann-drop-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ann-drop {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  padding: 16px;
+  border: 1.5px dashed rgba(18, 32, 61, 0.22);
+  border-radius: 14px;
+  background: #faf6ec;
+  color: var(--color-navy);
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    background 150ms,
+    border-color 150ms;
+}
+.ann-drop:hover:not(:disabled),
+.ann-drop--dragging {
+  border-color: var(--color-gold);
+  background: #fbf3df;
+}
+.ann-drop:disabled {
+  cursor: progress;
+}
+.ann-drop-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 6px;
+  border: 1px solid rgba(18, 32, 61, 0.12);
+  border-radius: 50%;
+  background: var(--color-surface);
+}
+.ann-drop-icon svg {
+  width: 20px;
+  height: 20px;
+}
+.ann-drop-title {
+  font-size: 14px;
+  font-weight: 600;
+}
+.ann-drop-link {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.ann-drop-hint {
+  font-size: 12.5px;
+  color: var(--color-text-secondary);
+}
+.ann-drop-preview {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border-radius: 14px;
+  background: var(--color-navy);
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+.ann-drop-preview.ann-drop--dragging {
+  outline-color: var(--color-gold);
+}
+.ann-drop-preview img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.ann-drop-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Footer: switch on the left, Cancel + primary on the right */
+.ann-modal-footer {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 14px;
+  width: 100%;
+}
+.ann-modal-footer-buttons {
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 8px;
+}
+.ann-switch-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-navy);
+  cursor: pointer;
+}
+/* The mobile sheet stretches every footer button to full width — not the switch. */
+.modal-footer .ann-switch-row button.ui-switch {
+  flex-shrink: 0;
+  width: 52px;
+  height: 30px;
+  border-radius: 999px;
+}
+
+@media (max-width: 1023px) {
+  .modal-body .ann-input {
+    height: 52px;
+    border-radius: 12px;
+    font-size: 16px; /* stops iOS zoom on focus */
+  }
+  .modal-body textarea.ann-textarea {
+    height: auto;
+  }
+  .ann-theme-card--empty .ann-btn {
+    min-height: 50px;
+  }
+}
+
+@media (min-width: 640px) and (max-width: 1023px) {
+  .ann-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 1024px) {
+  /* Home */
+  .theme-notice {
+    grid-template-columns: 40px minmax(0, 1fr) auto 44px;
+    grid-template-areas: "icon text btn close";
+    margin-top: 0;
+    padding: 12px 12px 12px 16px;
+  }
+  .theme-notice-btn {
+    min-height: 44px;
+    margin-right: 0;
+    font-size: 14px;
+  }
+  .home-theme {
+    order: 0;
+  }
+  /* Beside the announcements card the poster grows to match its height. */
+  .home-row .home-theme-poster {
+    flex: 1 1 auto;
+    min-height: 220px;
+    aspect-ratio: auto;
+  }
+
+  .home-announce {
+    min-height: 300px;
+  }
+
+  /* Page */
+  .ann-title {
+    font-size: 34px;
+  }
+  .ann-subtitle {
+    display: block;
+  }
+  .ann-new-long,
+  .ann-section-note-long {
+    display: inline;
+  }
+  .ann-new-short,
+  .ann-section-note-short {
+    display: none;
+  }
+  .ann-section-title {
+    font-size: 20px;
+  }
+  .ann-theme-grid {
+    grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  }
+  .ann-theme-card--empty {
+    padding: 28px;
+  }
+  .ann-theme-card--empty .ann-btn {
+    align-self: flex-start;
+  }
+  .ann-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .ann-new-tile {
+    min-height: 280px;
+  }
+
+  /* Modals */
+  .modal-body.ann-split {
+    grid-template-columns: minmax(0, 1fr) 380px;
+    grid-template-rows: minmax(0, 1fr);
+    overflow: hidden;
+  }
+  .ann-split-fields,
+  .ann-split-preview {
+    min-height: 0;
+    overflow-y: auto;
+  }
+  .ann-split-fields {
+    padding: 20px 28px 28px;
+  }
+  .ann-split-preview {
+    padding: 22px 24px 28px;
+    border-top: none;
+    border-left: 1px solid var(--color-line);
+  }
+  .ann-split--theme {
+    grid-template-columns: minmax(0, 1fr) 360px;
+  }
+  .ann-modal-footer {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .ann-modal-footer--end {
+    justify-content: flex-end;
+  }
+  .ann-modal-footer-buttons {
+    flex-direction: row;
+    gap: 12px;
+  }
+}

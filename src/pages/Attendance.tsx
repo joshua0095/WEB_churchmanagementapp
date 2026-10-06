@@ -1,14 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import {
-  createLifeGroup,
   getAttendanceEvents,
   getLifeGroups,
   getMyLifeGroups,
-  getUsers,
   type AttendanceEvent,
   type LifeGroupCategory,
-  type User,
 } from "../api";
 import { isAdmin, isMis } from "../auth";
 import {
@@ -29,7 +26,8 @@ import {
 } from "../components/attendance/attendanceFlow";
 import { zoomIntoPage } from "../components/attendance/zoomTransition";
 import { Modal, useToast } from "../components/dialogs";
-import { AppShell, Button, DatePicker, ProfileMenu, SelectField, Skeleton, TextField } from "../components/ui";
+import LifeGroupPicker from "../components/attendance/LifeGroupPicker";
+import { AppShell, Button, DatePicker, ProfileMenu, Skeleton } from "../components/ui";
 import { AttendanceIcon, CalendarIcon, LifeGroupIcon } from "../components/ui/icons";
 import { CheckThinIcon } from "../components/ui/shellIcons";
 
@@ -37,6 +35,8 @@ interface GroupOption {
   id: number;
   groupName: string;
   category: LifeGroupCategory;
+  /** Only known to overseers (from the full list); a leader's own groups leave it null — "You". */
+  leaderName: string | null;
 }
 
 // A Sunday-only event's "Other date" calendar refuses every other day outright.
@@ -198,13 +198,6 @@ function Attendance() {
     if (redirectTimer.current !== null) window.clearTimeout(redirectTimer.current);
   }, []);
 
-  const [addGroupOpen, setAddGroupOpen] = useState(false);
-  const [users, setUsers] = useState<User[]>([]);
-  const [newGroupName, setNewGroupName] = useState("");
-  const [newLeaderId, setNewLeaderId] = useState("");
-  const [creatingGroup, setCreatingGroup] = useState(false);
-  const [addGroupError, setAddGroupError] = useState<string | null>(null);
-
   // Admin/MIS see every event plus every life group. Anyone else only ever takes
   // attendance for the life group(s) they lead — the other events are Admin/MIS-only at
   // the API level — so for them this page is just the Life Groups path.
@@ -221,7 +214,7 @@ function Attendance() {
           const mine = await getMyLifeGroups();
           if (cancelled) return;
           if (mine.length === 0) setError("You don't have access to Attendance.");
-          setGroups(mine);
+          setGroups(mine.map((g) => ({ ...g, leaderName: null })));
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Failed to load attendance");
@@ -369,42 +362,6 @@ function Attendance() {
     }, ZOOM_START_MS);
   };
 
-  const openAddGroup = async () => {
-    setAddGroupOpen(true);
-    setAddGroupError(null);
-    if (users.length === 0) {
-      try {
-        setUsers(await getUsers());
-      } catch (err) {
-        setAddGroupError(err instanceof Error ? err.message : "Failed to load leaders");
-      }
-    }
-  };
-
-  const closeAddGroup = () => {
-    setAddGroupOpen(false);
-    setNewGroupName("");
-    setNewLeaderId("");
-    setAddGroupError(null);
-  };
-
-  const handleCreateGroup = async () => {
-    if (!newGroupName.trim() || !newLeaderId) return;
-    setCreatingGroup(true);
-    setAddGroupError(null);
-    try {
-      const created = await createLifeGroup(Number(newLeaderId), newGroupName.trim());
-      setGroups(await getLifeGroups());
-      selectGroup(created.id);
-      closeAddGroup();
-      toast.show({ type: "success", title: "Life group added" });
-    } catch (err) {
-      setAddGroupError(err instanceof Error ? err.message : "Failed to create life group");
-    } finally {
-      setCreatingGroup(false);
-    }
-  };
-
   const dateNote = !dateReady
     ? null
     : isLifeGroups && sundaysOnly
@@ -490,32 +447,15 @@ function Attendance() {
               locked={!reached("group")}
               summary={
                 selectedGroup &&
-                `${selectedGroup.groupName} · ${selectedGroup.category === "Community" ? "Community" : "Church"}`
+                `${selectedGroup.groupName} · ${selectedGroup.leaderName ?? "You"} · ${selectedGroup.category === "Community" ? "Community" : "Church"}`
               }
               onChange={overseer || groups.length > 1 ? () => setStep("group") : undefined}
             >
               <div className="att-group-row">
-                <SelectField
-                  label="Life Group"
-                  className="att-group-select"
-                  value={groupId !== null ? String(groupId) : ""}
-                  onChange={(e) => selectGroup(e.target.value ? Number(e.target.value) : null)}
-                >
-                  <option value="">Choose a life group…</option>
-                  {groups.map((g) => (
-                    <option key={g.id} value={g.id}>
-                      {g.groupName} · {g.category === "Community" ? "Community" : "Church"}
-                    </option>
-                  ))}
-                </SelectField>
+                <LifeGroupPicker groups={groups} value={groupId} onChange={selectGroup} />
                 {selectedGroup && (
                   <Button type="button" className="att-group-add" onClick={() => setStep("date")}>
                     Continue
-                  </Button>
-                )}
-                {overseer && (
-                  <Button type="button" variant="outline" className="att-group-add" onClick={() => void openAddGroup()}>
-                    + Add Life Group
                   </Button>
                 )}
               </div>
@@ -585,49 +525,6 @@ function Attendance() {
         </div>
       </Modal>
 
-      {overseer && (
-        <Modal
-          open={addGroupOpen}
-          onClose={closeAddGroup}
-          size="sm"
-          title="Add Life Group"
-          footer={
-            <>
-              <Button type="button" variant="outline" onClick={closeAddGroup}>
-                Cancel
-              </Button>
-              <Button
-                type="button"
-                onClick={() => void handleCreateGroup()}
-                disabled={creatingGroup || !newGroupName.trim() || !newLeaderId}
-              >
-                {creatingGroup ? "Adding…" : "Add group"}
-              </Button>
-            </>
-          }
-        >
-          <TextField
-            label="Group name"
-            value={newGroupName}
-            onChange={(e) => setNewGroupName(e.target.value)}
-            placeholder="e.g. Norzagaray Life Group"
-            data-autofocus
-          />
-          <SelectField label="Leader" value={newLeaderId} onChange={(e) => setNewLeaderId(e.target.value)}>
-            <option value="">Select a leader…</option>
-            {users.map((u) => (
-              <option key={u.id} value={u.id}>
-                {u.name}
-              </option>
-            ))}
-          </SelectField>
-          {addGroupError && (
-            <p className="att-field-error" role="alert">
-              {addGroupError}
-            </p>
-          )}
-        </Modal>
-      )}
     </AppShell>
   );
 }

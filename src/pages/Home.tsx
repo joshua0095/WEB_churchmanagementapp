@@ -1,20 +1,29 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import {
   getAnnouncements,
   getAttendanceEvents,
   getBibleVersions,
+  versionShortLabel,
+  getCurrentMonthlyTheme,
   getDevotions,
   getMe,
+  getMonthlyThemes,
   getVerseOfTheDay,
+  monthlyThemeImageSrc,
   type Announcement,
   type AttendanceEvent,
+  type MonthlyThemeInfo,
+  type MonthlyThemeOverview,
   type VerseOfTheDay,
 } from "../api";
 import { canAccessModule, isAdmin } from "../auth";
+import { ThemeCard } from "../components/announcements/HomeCards";
+import MonthlyThemeModal from "../components/announcements/MonthlyThemeModal";
+import ThemeNotice, { themeNoticeFor } from "../components/announcements/ThemeNotice";
 import { AnnouncementCarousel, AppShell, ProfileMenu, Skeleton } from "../components/ui";
 import { ChurchIcon, NavAnnouncementsIcon, NavDevotionIcon } from "../components/ui/shellIcons";
-import { monthlyTheme } from "../monthlyTheme";
+import { formatThemeMonth, manilaMonth, themeAltText } from "../monthlyTheme";
 import { getBibleVersionId } from "../preferences";
 import sanctuaryPhoto from "../assets/login-bg.jpg";
 
@@ -140,9 +149,9 @@ function WalkCard({ icon, title, status, action }: WalkCardProps) {
 function Home() {
   const canAttendance = isAdmin() || canAccessModule("Attendance");
   const canAnnouncements = isAdmin() || canAccessModule("Announcements");
-  const theme = monthlyTheme && monthlyTheme.title.trim() ? monthlyTheme : null;
 
   const [firstName, setFirstName] = useState("");
+  const [userKey, setUserKey] = useState<string | null>(null);
   const [blessing] = useState(randomBlessing);
   const [verse, setVerse] = useState<VerseOfTheDay | null>(null);
   const [verseError, setVerseError] = useState<string | null>(null);
@@ -154,10 +163,17 @@ function Home() {
   // null = still loading; "unknown" = the fetch failed, so the card just offers the Devotion page.
   const [wroteToday, setWroteToday] = useState<boolean | "unknown" | null>(null);
   const [gathering, setGathering] = useState<string | null>(null);
+  const [theme, setTheme] = useState<MonthlyThemeInfo | null>(null);
+  // Only fetched for people who manage announcements — drives the "theme isn't set" notice.
+  const [themeOverview, setThemeOverview] = useState<MonthlyThemeOverview | null>(null);
+  const [themeModalMonth, setThemeModalMonth] = useState<string | null>(null);
 
   useEffect(() => {
     getMe()
-      .then((me) => setFirstName(me.firstName))
+      .then((me) => {
+        setFirstName(me.firstName);
+        setUserKey(String(me.id));
+      })
       .catch(() => {
         // The greeting just falls back to no name — nothing else on this page depends on it.
       });
@@ -173,7 +189,10 @@ function Home() {
     // when the user has picked one in Settings (otherwise it's the server's default).
     if (versionId) {
       getBibleVersions()
-        .then((versions) => setVersionLabel(versions.find((v) => v.id === versionId)?.abbreviation ?? null))
+        .then((versions) => {
+          const version = versions.find((v) => v.id === versionId);
+          setVersionLabel(version ? versionShortLabel(version) : null);
+        })
         .catch(() => {});
     }
   }, []);
@@ -184,6 +203,21 @@ function Home() {
       .catch((err) => setAnnouncementsError(err instanceof Error ? err.message : "Failed to load announcements"))
       .finally(() => setAnnouncementsLoading(false));
   }, []);
+
+  const loadTheme = useCallback(() => {
+    getCurrentMonthlyTheme()
+      .then(setTheme)
+      .catch(() => setTheme(null)); // no poster card is the same as no theme — announcements take the row
+    if (canAnnouncements) {
+      getMonthlyThemes()
+        .then(setThemeOverview)
+        .catch(() => {});
+    }
+  }, [canAnnouncements]);
+
+  useEffect(() => {
+    loadTheme();
+  }, [loadTheme]);
 
   useEffect(() => {
     getDevotions()
@@ -201,10 +235,21 @@ function Home() {
   const weekStart = startOfWeek(new Date());
   const announcementsThisWeek = announcements.filter((a) => new Date(a.createdAt) >= weekStart).length;
   const walkCount = 1 + (canAttendance ? 1 : 0) + (canAnnouncements ? 1 : 0);
+  const notice = themeOverview ? themeNoticeFor(themeOverview) : null;
 
   return (
     <AppShell headerRight={<ProfileMenu />} pageClassName="page--home">
       <div className="home">
+        {notice && themeOverview && userKey && (
+          <ThemeNotice
+            key={notice.month}
+            notice={notice}
+            today={themeOverview.today}
+            userKey={userKey}
+            onUpload={setThemeModalMonth}
+          />
+        )}
+
         {/* 1. Welcome banner */}
         <section className="home-hero" aria-labelledby="home-greeting">
           <span className="home-ribbon" aria-hidden="true" />
@@ -261,13 +306,11 @@ function Home() {
           )}
 
           {theme && (
-            <section className="home-theme" aria-label="Theme of the month">
-              <p className="home-theme-label">{theme.month} · Theme of the month</p>
-              <p className="home-theme-keyword">{theme.keyword}</p>
-              <h2 className="home-theme-title">{theme.title}</h2>
-              <span className="home-theme-divider" aria-hidden="true" />
-              <p className="home-theme-verses">{theme.verses.join(" · ")}</p>
-            </section>
+            <ThemeCard
+              monthLabel={formatThemeMonth(theme.month)}
+              imageSrc={monthlyThemeImageSrc(theme)}
+              alt={themeAltText(theme.month, theme.name)}
+            />
           )}
         </div>
 
@@ -324,6 +367,16 @@ function Home() {
           </div>
         </section>
       </div>
+
+      {canAnnouncements && (
+        <MonthlyThemeModal
+          open={themeModalMonth !== null}
+          currentMonth={themeOverview?.currentMonth ?? manilaMonth()}
+          initialMonth={themeModalMonth ?? themeOverview?.currentMonth ?? manilaMonth()}
+          onClose={() => setThemeModalMonth(null)}
+          onSaved={loadTheme}
+        />
+      )}
     </AppShell>
   );
 }

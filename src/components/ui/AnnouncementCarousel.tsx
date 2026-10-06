@@ -1,8 +1,9 @@
-import { useRef, useState, type TouchEvent } from "react";
+import { useRef, useState, type MouseEvent, type TouchEvent } from "react";
 import { Link } from "react-router-dom";
 import type { Announcement } from "../../api";
-import Modal from "./Modal";
+import { AnnouncementCover, AnnouncementSlide, announcementTitle, formatLongDate, parseEventDate } from "../announcements/HomeCards";
 import { CalendarIcon } from "./icons";
+import { Modal } from "../dialogs";
 import { NavChevronIcon } from "./shellIcons";
 
 interface AnnouncementCarouselProps {
@@ -14,18 +15,13 @@ interface AnnouncementCarouselProps {
 /** Minimum horizontal travel (px) before a touch counts as a swipe rather than a tap/scroll. */
 const SWIPE_THRESHOLD = 40;
 
-/** "Sunday, 13 September 2026" */
-function formatLongDate(d: Date): string {
-  const weekday = d.toLocaleDateString("en-US", { weekday: "long" });
-  const rest = d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" });
-  return `${weekday}, ${rest}`;
-}
-
 /** Home's announcements card: one announcement at a time with dots, prev/next and swipe,
  * and a "Read more" dialog for the full text and image. */
 function AnnouncementCarousel({ items, showViewAll = false }: AnnouncementCarouselProps) {
   const [index, setIndex] = useState(0);
   const [readingId, setReadingId] = useState<number | null>(null);
+  // Image slides hide their text until hover/focus; on touch screens a tap reveals it instead.
+  const [revealed, setRevealed] = useState(false);
   const touchStart = useRef<{ x: number; y: number } | null>(null);
 
   if (items.length === 0) return null;
@@ -33,10 +29,21 @@ function AnnouncementCarousel({ items, showViewAll = false }: AnnouncementCarous
   const hasMany = items.length > 1;
   const reading = items.find((a) => a.id === readingId) ?? null;
 
-  const prev = () => setIndex((i) => (i - 1 + items.length) % items.length);
-  const next = () => setIndex((i) => (i + 1) % items.length);
+  const prev = () => {
+    setIndex((i) => (i - 1 + items.length) % items.length);
+    setRevealed(false);
+  };
+  const next = () => {
+    setIndex((i) => (i + 1) % items.length);
+    setRevealed(false);
+  };
+
+  // React bubbles events out of portals along the component tree, so taps and swipes inside
+  // the (portaled) Read more dialog would reach the card's handlers too — ignore those.
+  const fromCard = (e: { currentTarget: Element; target: EventTarget }) => e.currentTarget.contains(e.target as Node);
 
   const onTouchStart = (e: TouchEvent) => {
+    if (!fromCard(e)) return;
     const t = e.touches[0];
     touchStart.current = { x: t.clientX, y: t.clientY };
   };
@@ -53,10 +60,27 @@ function AnnouncementCarousel({ items, showViewAll = false }: AnnouncementCarous
     else prev();
   };
 
-  const title = item.title || item.eyebrow || "Announcement";
+  const imageSrc = item.imageDataUrl;
+  const toggleDetails = (e: MouseEvent) => {
+    if (!imageSrc || !fromCard(e) || (e.target as HTMLElement).closest("a, button")) return;
+    setRevealed((r) => !r);
+  };
 
   return (
-    <section className="home-card home-announce" aria-label="Church announcements">
+    <section
+      className={[
+        "home-card home-announce",
+        imageSrc && "home-announce--image",
+        imageSrc && revealed && "home-announce--revealed",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      aria-label="Church announcements"
+      onClick={toggleDetails}
+      onTouchStart={onTouchStart}
+      onTouchEnd={onTouchEnd}
+    >
+      {imageSrc && <AnnouncementCover src={imageSrc} alt={announcementTitle(item) ?? "Church announcement"} />}
       <div className="home-announce-head">
         <p className="home-eyebrow">Church announcements</p>
         {showViewAll && (
@@ -66,16 +90,8 @@ function AnnouncementCarousel({ items, showViewAll = false }: AnnouncementCarous
         )}
       </div>
 
-      <div className="home-announce-body" onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
-        <p className="home-announce-date">
-          <CalendarIcon aria-hidden="true" />
-          <span>
-            {formatLongDate(new Date(item.createdAt))}
-            {item.title && item.eyebrow ? ` · ${item.eyebrow}` : ""}
-          </span>
-        </p>
-        <h2 className="home-announce-title">{title}</h2>
-        {item.content && <p className="home-announce-excerpt">{item.content}</p>}
+      <div className="home-announce-body">
+        <AnnouncementSlide date={parseEventDate(item.eventDate)} title={announcementTitle(item)} content={item.content} />
       </div>
 
       <div className="home-announce-foot">
@@ -109,15 +125,21 @@ function AnnouncementCarousel({ items, showViewAll = false }: AnnouncementCarous
         )}
       </div>
 
-      <Modal open={reading !== null} onClose={() => setReadingId(null)} title={reading?.title || reading?.eyebrow || "Announcement"}>
+      <Modal open={reading !== null} onClose={() => setReadingId(null)} title={(reading && announcementTitle(reading)) || "Announcement"}>
         {reading && (
           <div className="flex flex-col gap-3">
-            <p className="m-0 text-sm text-[var(--color-text-secondary)]">
-              {formatLongDate(new Date(reading.createdAt))}
-              {reading.title && reading.eyebrow ? ` · ${reading.eyebrow}` : ""}
-            </p>
-            {reading.imageDataUrl && <img src={reading.imageDataUrl} alt="" className="block w-full rounded-lg" />}
             {reading.content && <p className="m-0 whitespace-pre-line leading-relaxed">{reading.content}</p>}
+            {reading.eventDate && (
+              <p className="home-announce-date">
+                <CalendarIcon aria-hidden="true" />
+                <span>{formatLongDate(parseEventDate(reading.eventDate)!)}</span>
+              </p>
+            )}
+            {/* Title, details and date only — the image is already the card itself, so it's only
+                shown here for an image-only announcement that has nothing else to read. */}
+            {!reading.content && !announcementTitle(reading) && reading.imageDataUrl && (
+              <img src={reading.imageDataUrl} alt="" className="block w-full rounded-lg" />
+            )}
           </div>
         )}
       </Modal>

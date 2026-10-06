@@ -54,7 +54,10 @@ if (!API_URL) {
 async function apiFetch(path: string, options: RequestInit = {}): Promise<Response> {
   const token = getToken();
   const headers = new Headers(options.headers);
-  headers.set("Content-Type", "application/json");
+  // A FormData body needs the browser to write its own multipart Content-Type (with the boundary).
+  if (!(options.body instanceof FormData)) {
+    headers.set("Content-Type", "application/json");
+  }
   if (token) {
     headers.set("Authorization", `Bearer ${token}`);
   }
@@ -240,6 +243,12 @@ export interface BibleVersion {
   id: string;
   abbreviation: string;
   title: string;
+}
+
+/** The short label people know a translation by: API.Bible abbreviations carry an edition
+ * year ("NIV11", "NASB95"), which is dropped here — "NIV", "NASB". */
+export function versionShortLabel(version: BibleVersion): string {
+  return version.abbreviation.replace(/\d+$/, "") || version.abbreviation;
 }
 
 export async function getVerseOfTheDay(bibleId?: string | null): Promise<VerseOfTheDay> {
@@ -552,7 +561,11 @@ export interface Announcement {
   title: string | null;
   content: string | null;
   imageDataUrl: string | null;
+  /** Optional day it's for, "yyyy-MM-dd". The server deletes it once the day after has passed. */
+  eventDate: string | null;
   createdAt: string;
+  /** When "Send to members" last went out; null if it's never been sent. */
+  sentAt: string | null;
 }
 
 export interface AnnouncementRequest {
@@ -560,6 +573,7 @@ export interface AnnouncementRequest {
   title: string | null;
   content: string | null;
   imageDataUrl: string | null;
+  eventDate: string | null;
 }
 
 export async function getAnnouncements(): Promise<Announcement[]> {
@@ -581,6 +595,17 @@ export async function createAnnouncement(announcement: AnnouncementRequest): Pro
   return res.json();
 }
 
+export async function updateAnnouncement(id: number, announcement: AnnouncementRequest): Promise<Announcement> {
+  const res = await apiFetch(`/api/announcements/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(announcement),
+  });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to update announcement (${res.status})`);
+  }
+  return res.json();
+}
+
 export async function deleteAnnouncement(id: number): Promise<void> {
   const res = await apiFetch(`/api/announcements/${id}`, { method: "DELETE" });
   if (!res.ok) {
@@ -588,12 +613,73 @@ export async function deleteAnnouncement(id: number): Promise<void> {
   }
 }
 
-export async function sendAnnouncement(id: number): Promise<{ sentCount: number }> {
+export async function sendAnnouncement(id: number): Promise<{ sentCount: number; sentAt: string | null }> {
   const res = await apiFetch(`/api/announcements/${id}/send`, { method: "POST" });
   if (!res.ok) {
     throw new Error((await res.text()) || `Failed to send announcement (${res.status})`);
   }
   return res.json();
+}
+
+/** The theme-of-the-month poster on Home. `month` is "yyyy-MM". */
+export interface MonthlyThemeInfo {
+  month: string;
+  /** Relative to the API — pass through monthlyThemeImageSrc() for an <img src>. */
+  imageUrl: string;
+  name: string | null;
+  updatedAt: string;
+}
+
+export interface MonthlyThemeOverview {
+  /** Today in Manila time, "yyyy-MM-dd" — the server's clock, so the "from the 25th" notice
+   * doesn't depend on the device's timezone. */
+  today: string;
+  currentMonth: string;
+  current: MonthlyThemeInfo | null;
+  nextMonth: string;
+  next: MonthlyThemeInfo | null;
+}
+
+export function monthlyThemeImageSrc(theme: MonthlyThemeInfo): string {
+  return `${API_URL}${theme.imageUrl}`;
+}
+
+/** This month's theme (Manila time), or null when none is set. */
+export async function getCurrentMonthlyTheme(): Promise<MonthlyThemeInfo | null> {
+  const res = await apiFetch("/api/monthly-theme/current");
+  if (res.status === 204) return null;
+  if (!res.ok) {
+    throw new Error(`Failed to fetch the monthly theme (${res.status})`);
+  }
+  return res.json();
+}
+
+/** `from` ("yyyy-MM", default this month) and the month after it. Announcement managers only. */
+export async function getMonthlyThemes(from?: string): Promise<MonthlyThemeOverview> {
+  const res = await apiFetch(`/api/monthly-theme${from ? `?from=${from}` : ""}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch monthly themes (${res.status})`);
+  }
+  return res.json();
+}
+
+/** Creates or replaces a month's theme. Leave `image` null to change only the name of one that exists. */
+export async function saveMonthlyTheme(month: string, image: Blob | null, name: string | null): Promise<MonthlyThemeInfo> {
+  const form = new FormData();
+  if (image) form.append("image", image, `${month}.jpg`);
+  if (name) form.append("name", name);
+  const res = await apiFetch(`/api/monthly-theme/${month}`, { method: "PUT", body: form });
+  if (!res.ok) {
+    throw new Error((await res.text()) || `Failed to save the theme (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function deleteMonthlyTheme(month: string): Promise<void> {
+  const res = await apiFetch(`/api/monthly-theme/${month}`, { method: "DELETE" });
+  if (!res.ok) {
+    throw new Error(`Failed to remove the theme (${res.status})`);
+  }
 }
 
 export interface Devotion {
@@ -786,12 +872,32 @@ export interface AttendanceRoster {
   people: AttendancePerson[];
 }
 
-export async function getAttendanceEvents(): Promise<AttendanceEvent[]> {
-  const res = await apiFetch("/api/attendance/events");
-  if (!res.ok) {
-    throw new Error(`Failed to fetch events (${res.status})`);
-  }
-  return res.json();
+// The event list rarely changes but every attendance screen needs it — setup, then check-in
+// or headcount right after — so it's kept briefly instead of refetched on each screen (that
+// refetch sat in front of opening the session). Any event edit below clears it.
+const EVENTS_CACHE_MS = 5 * 60 * 1000;
+let eventsCache: { at: number; promise: Promise<AttendanceEvent[]> } | null = null;
+
+function invalidateAttendanceEvents() {
+  eventsCache = null;
+}
+
+export function getAttendanceEvents(): Promise<AttendanceEvent[]> {
+  if (eventsCache && Date.now() - eventsCache.at < EVENTS_CACHE_MS) return eventsCache.promise;
+  const promise = (async () => {
+    const res = await apiFetch("/api/attendance/events");
+    if (!res.ok) {
+      throw new Error(`Failed to fetch events (${res.status})`);
+    }
+    return (await res.json()) as AttendanceEvent[];
+  })();
+  const entry = { at: Date.now(), promise };
+  eventsCache = entry;
+  // Don't keep a failure around — the next screen should try again.
+  promise.catch(() => {
+    if (eventsCache === entry) eventsCache = null;
+  });
+  return promise;
 }
 
 export interface SaveEventInput {
@@ -801,6 +907,7 @@ export interface SaveEventInput {
 }
 
 export async function createAttendanceEvent(input: SaveEventInput): Promise<AttendanceEvent> {
+  invalidateAttendanceEvents();
   const res = await apiFetch("/api/attendance/events", { method: "POST", body: JSON.stringify(input) });
   if (!res.ok) {
     throw new Error((await res.text()) || `Failed to add event (${res.status})`);
@@ -809,6 +916,7 @@ export async function createAttendanceEvent(input: SaveEventInput): Promise<Atte
 }
 
 export async function updateAttendanceEvent(eventId: number, input: SaveEventInput): Promise<AttendanceEvent> {
+  invalidateAttendanceEvents();
   const res = await apiFetch(`/api/attendance/events/${eventId}`, { method: "PUT", body: JSON.stringify(input) });
   if (!res.ok) {
     throw new Error((await res.text()) || `Failed to update event (${res.status})`);
@@ -818,6 +926,7 @@ export async function updateAttendanceEvent(eventId: number, input: SaveEventInp
 
 /** Refused (409) once the event has any attendance recorded. */
 export async function deleteAttendanceEvent(eventId: number): Promise<void> {
+  invalidateAttendanceEvents();
   const res = await apiFetch(`/api/attendance/events/${eventId}`, { method: "DELETE" });
   if (!res.ok) {
     throw new Error((await res.text()) || `Failed to delete event (${res.status})`);
@@ -825,6 +934,7 @@ export async function deleteAttendanceEvent(eventId: number): Promise<void> {
 }
 
 export async function setEventSundayOnly(eventId: number, sundayOnly: boolean): Promise<AttendanceEvent> {
+  invalidateAttendanceEvents();
   const res = await apiFetch(`/api/attendance/events/${eventId}/sunday-only`, {
     method: "PUT",
     body: JSON.stringify({ sundayOnly }),
@@ -836,6 +946,7 @@ export async function setEventSundayOnly(eventId: number, sundayOnly: boolean): 
 }
 
 export async function setEventRosterScope(eventId: number, rosterScope: RosterScope): Promise<AttendanceEvent> {
+  invalidateAttendanceEvents();
   const res = await apiFetch(`/api/attendance/events/${eventId}/roster-scope`, {
     method: "PUT",
     body: JSON.stringify({ rosterScope }),

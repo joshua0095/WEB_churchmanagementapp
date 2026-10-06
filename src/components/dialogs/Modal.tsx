@@ -4,7 +4,7 @@ import { CheckThinIcon } from "../ui/shellIcons";
 import { CloseXIcon, TrashTileIcon } from "./icons";
 
 export type ModalVariant = "form" | "confirm" | "success";
-export type ModalSize = "sm" | "md" | "lg";
+export type ModalSize = "sm" | "md" | "lg" | "xl";
 
 export interface ModalProps {
   open: boolean;
@@ -15,7 +15,7 @@ export interface ModalProps {
    * moment (see useConfirm/ToastProvider for everyday confirms/saves instead). */
   variant?: ModalVariant;
   /** sm 440px, md 560px, lg 720px (a long form, e.g. a devotion — also a ~94%-tall sheet on
-   * mobile). Defaults to "sm" for confirm/success, "md" for form. */
+   * mobile), xl 980px (a two-column form with a live preview beside it). Defaults to "sm" for confirm/success, "md" for form. */
   size?: ModalSize;
   title: string;
   description?: string;
@@ -23,6 +23,11 @@ export interface ModalProps {
    * `description` covers it, matching the reference's markup). */
   children?: ReactNode;
   footer?: ReactNode;
+  /** variant="form": content pinned under the title, outside the scrolling body — e.g. tabs. */
+  headerExtra?: ReactNode;
+  /** Extra class on the scrolling body (variant="form") — e.g. a two-column layout that
+   * manages its own padding and scrolling. */
+  bodyClassName?: string;
   /** confirm: the icon-tile glyph (defaults to a trash icon — every confirm in this app is a
    * delete/remove). success: the check-circle glyph (defaults to a checkmark). Ignored for
    * variant="form". */
@@ -43,7 +48,7 @@ const FOCUSABLE_SELECTOR = "button:not([disabled]), input:not([disabled]), selec
  * Rendered through a portal; traps focus while open and returns it to whatever had focus
  * before opening. Esc and a backdrop click close "form"/"success" but not "confirm" (that
  * variant demands an explicit button choice) — see useConfirm for the common case. */
-function Modal({ open, onClose, variant = "form", size, title, description, children, footer, icon, danger = true }: ModalProps) {
+function Modal({ open, onClose, variant = "form", size, title, description, children, footer, headerExtra, bodyClassName, icon, danger = true }: ModalProps) {
   const resolvedSize = size ?? (variant === "form" ? "md" : "sm");
   const dismissible = variant !== "confirm";
   const [rendered, setRendered] = useState(open);
@@ -87,8 +92,12 @@ function Modal({ open, onClose, variant = "form", size, title, description, chil
   useEffect(() => {
     if (!rendered) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && dismissible) {
-        onClose();
+      if (e.key === "Escape") {
+        // Only the top-most dialog reacts — e.g. Esc in a photo-crop dialog opened from inside
+        // this one (or a confirm stacked on it) must not also close this one and lose the form.
+        // Later in document order = on top (nested inside, or portaled after).
+        const open = document.querySelectorAll("[aria-modal='true']");
+        if (dismissible && open[open.length - 1] === modalRef.current) onClose();
         return;
       }
       if (e.key !== "Tab") return;
@@ -152,7 +161,8 @@ function Modal({ open, onClose, variant = "form", size, title, description, chil
                 <CloseXIcon />
               </button>
             </div>
-            <div className="modal-body">{children}</div>
+            {headerExtra && <div className="modal-header-extra">{headerExtra}</div>}
+            <div className={["modal-body", bodyClassName].filter(Boolean).join(" ")}>{children}</div>
           </>
         )}
 

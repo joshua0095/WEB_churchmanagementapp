@@ -333,15 +333,200 @@ html.att-zoom-vt::view-transition-new(root) {
 .att-group-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
+  align-items: center;
   gap: 12px;
-}
-.att-group-select {
-  flex: 1 1 280px;
-  max-width: 440px;
 }
 .att-group-add {
   height: 44px;
+}
+
+/* Life Group picker — closed, it matches the outline Button beside it (44px, 1.5px hairline,
+   10px radius, 15px text); open, a card-style list with leader and type per group. */
+.lg-picker {
+  position: relative;
+  flex: 1 1 300px;
+  max-width: 460px;
+}
+.lg-picker-trigger {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 44px;
+  padding: 0 12px 0 16px;
+  border: 1.5px solid var(--color-line-strong);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-navy);
+  font-family: inherit;
+  font-size: 0.95rem;
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.lg-picker-trigger:hover {
+  border-color: color-mix(in srgb, var(--color-navy) 30%, transparent);
+}
+.lg-picker-trigger--open,
+.lg-picker-trigger:focus-visible {
+  border-color: var(--color-navy);
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-gold) 35%, transparent);
+}
+.lg-picker-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+.lg-picker-name {
+  flex-shrink: 0;
+  max-width: 65%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 700;
+}
+.lg-picker-leader {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text-secondary);
+}
+.lg-picker-placeholder {
+  flex: 1 1 auto;
+  color: var(--color-text-secondary);
+}
+.lg-picker-chevron {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  color: var(--color-text-secondary);
+  transition: transform 0.15s;
+}
+.lg-picker-trigger--open .lg-picker-chevron {
+  transform: rotate(180deg);
+}
+
+.lg-picker-pop {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  min-width: 280px;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: 14px;
+  background: var(--color-surface);
+  box-shadow: 0 16px 40px rgba(18, 32, 61, 0.18);
+}
+.lg-picker-search {
+  display: block;
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  border: 0;
+  border-bottom: 1px solid var(--color-line);
+  background: var(--color-bg-soft);
+  color: var(--color-navy);
+  font-family: inherit;
+  font-size: 0.95rem;
+  outline: none;
+}
+.lg-picker-list {
+  max-height: 320px;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+  outline: none;
+}
+.lg-picker-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 8px 10px 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.lg-picker-option--active {
+  background: var(--color-bg-soft);
+}
+.lg-picker-option--selected {
+  background: color-mix(in srgb, var(--color-gold) 12%, transparent);
+}
+.lg-picker-option-text {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+}
+.lg-picker-option-name {
+  overflow: hidden;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--color-navy);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.lg-picker-option-leader {
+  overflow: hidden;
+  font-size: 0.8125rem;
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.lg-picker-chip {
+  flex-shrink: 0;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.lg-picker-chip--church {
+  background: color-mix(in srgb, var(--color-navy) 8%, transparent);
+  color: var(--color-navy);
+}
+.lg-picker-chip--community {
+  background: #f6ebcf;
+  color: #9a6f10;
+}
+.lg-picker-check {
+  display: flex;
+  flex-shrink: 0;
+  width: 18px;
+  color: var(--color-gold);
+}
+.lg-picker-check svg {
+  width: 18px;
+  height: 18px;
+}
+.lg-picker-empty {
+  padding: 14px 12px;
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+
+@media (max-width: 1023px) {
+  .lg-picker {
+    flex-basis: 100%;
+    max-width: none;
+  }
+  .lg-picker-trigger,
+  .lg-picker-search {
+    height: 50px;
+    font-size: 1rem; /* 16px stops iOS zoom on focus */
+  }
+  .att-group-add {
+    flex: 1 1 auto;
+    height: 50px;
+  }
 }
 
 /* Date chips */

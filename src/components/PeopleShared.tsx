@@ -4,17 +4,19 @@ import { Button, Modal } from "./ui";
 import { CameraIcon } from "./ui/shellIcons";
 import { cropImageToDataUrl } from "../utils/imageCompression";
 
-type AvatarSize = "xs" | "sm" | "md" | "lg" | "xl";
+type AvatarSize = "xs" | "sm" | "row" | "md" | "lg" | "form" | "xl";
 /** "navy" (default) matches every existing avatar across the app (worker/congregation
  * lists, leader pickers, etc.) — "gold"/"cream" are only for the shell's own avatars
  * (sidebar user card, account button, profile hero) and never change that default. */
-type AvatarTone = "navy" | "gold" | "cream";
+type AvatarTone = "navy" | "gold" | "cream" | "sand" | "mist";
 
 const AVATAR_SIZE_CLASSES: Record<AvatarSize, string> = {
   xs: "h-7 w-7 text-xs",
   sm: "h-9 w-9 text-sm",
+  row: "h-10 w-10 text-sm", // 40px — list rows (Workers)
   md: "h-12 w-12 text-base",
   lg: "h-16 w-16 text-lg",
+  form: "h-[72px] w-[72px] text-2xl", // the worker form's photo field
   xl: "h-28 w-28 text-4xl",
 };
 
@@ -22,6 +24,9 @@ const AVATAR_TONE_CLASSES: Record<AvatarTone, string> = {
   navy: "bg-[var(--color-navy)] text-white",
   gold: "bg-[var(--color-gold)] text-[var(--color-text-on-gold)]",
   cream: "bg-[var(--color-bg)] text-[var(--color-text-primary)]",
+  // Alternating soft tints for the Workers list (row by row), so a page of initials isn't a wall of navy.
+  sand: "bg-[#F1E7CF] text-[var(--color-navy)]",
+  mist: "bg-[#E6E9F0] text-[var(--color-navy)]",
 };
 
 export function InitialAvatar({
@@ -283,6 +288,32 @@ export function PhotoPicker({ name, photoUrl, onChange }: PhotoPickerProps) {
   );
 }
 
+/** The worker form's photo control: 72px avatar, an outline "Change photo" button with a
+ * camera icon, and a red text "Remove" — same pick → crop → compress flow as PhotoPicker. */
+export function PhotoField({ name, photoUrl, onChange }: PhotoPickerProps) {
+  const { error, openPicker, fileInput, cropModal } = usePhotoUpload(onChange, photoUrl);
+
+  return (
+    <div className="wk-photo">
+      <InitialAvatar name={name} photoUrl={photoUrl} size="form" tone="sand" serif />
+      <div className="wk-photo-actions">
+        <button type="button" className="wk-btn wk-btn--outline wk-btn--sm" onClick={openPicker}>
+          <CameraIcon />
+          {photoUrl ? "Change photo" : "Add photo"}
+        </button>
+        {photoUrl && (
+          <button type="button" className="wk-text-danger" onClick={() => onChange(null)}>
+            Remove
+          </button>
+        )}
+      </div>
+      {fileInput}
+      {error && <p className="wk-field-error">{error}</p>}
+      {cropModal}
+    </div>
+  );
+}
+
 interface EditableAvatarProps {
   name: string;
   photoUrl: string | null;
@@ -333,4 +364,12 @@ export function formatBirthday(value: string | null): string {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "—";
   return date.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+}
+
+/** "Jul 16" — month and day only, never the year (lists show when to celebrate, not ages). */
+export function formatBirthdayShort(value: string | null): string | null {
+  if (!value) return null;
+  const [y, m, d] = value.slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return `${new Date(y, m - 1, d).toLocaleDateString("en-US", { month: "short" })} ${d}`;
 }

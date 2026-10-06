@@ -1,200 +1,68 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useMemo, useState } from "react";
 import {
-  createUser,
   deleteUser,
   getMinistries,
   getNetworks,
   getUsers,
   resetUserPassword,
   setUserActive,
-  updateUser,
   type Ministry,
   type Network,
   type User,
 } from "../api";
 import { isAdmin } from "../auth";
-import { InitialAvatar, PhotoPicker, formatBirthday } from "../components/PeopleShared";
-import {
-  buildNetworkTree,
-  flattenNetworksForSelect,
-  getAncestorNetworkIds,
-  SINGLE_SELECT_PARENT_NAME,
-  type NetworkTreeNode,
-} from "../components/networkTree";
-import {
-  AppShell,
-  Button,
-  Card,
-  DropdownMenu,
-  FilterBar,
-  Modal,
-  Pagination,
-  ProfileMenu,
-  SelectField,
-  Skeleton,
-  Spinner,
-  TextField,
-  type DropdownMenuItem,
-} from "../components/ui";
+import { useConfirm, useToast } from "../components/dialogs";
+import { InitialAvatar, formatBirthdayShort } from "../components/PeopleShared";
+import { buildNetworkTree, flattenNetworksForSelect, type NetworkTreeNode } from "../components/networkTree";
+import { ChipList, type ChipItem } from "../components/people/PeopleChips";
+import WorkerModal from "../components/people/WorkerModal";
+import { AppShell, DropdownMenu, Pagination, ProfileMenu, Skeleton, Spinner, type DropdownMenuItem } from "../components/ui";
+import { KebabIcon, TopbarSearchIcon } from "../components/ui/shellIcons";
 import { getPageSize, setPageSize } from "../preferences";
-import { confirmDialog, infoAlert, successToast } from "../swal";
+import { infoAlert } from "../swal";
 
-const emptyUserForm = {
-  firstName: "",
-  middleName: "",
-  lastName: "",
-  nickname: "",
-  email: "",
-  birthday: "",
-  photoDataUrl: null as string | null,
-  ministryIds: [] as number[],
-  networkIds: [] as number[],
-};
-
-interface NetworkPickerNodeProps {
-  node: NetworkTreeNode;
-  depth: number;
-  /** Non-null when this node is one of several mutually-exclusive siblings (e.g. under LGN) — renders a radio instead of a checkbox. */
-  singleSelectSiblingIds: number[] | null;
-  networkIds: number[];
-  ministryIds: number[];
-  onToggleNetwork: (id: number) => void;
-  onSelectSingleNetwork: (siblingIds: number[], id: number) => void;
-  onToggleMinistry: (id: number) => void;
-}
-
-function NetworkPickerNode({
-  node,
-  depth,
-  singleSelectSiblingIds,
-  networkIds,
-  ministryIds,
-  onToggleNetwork,
-  onSelectSingleNetwork,
-  onToggleMinistry,
-}: NetworkPickerNodeProps) {
-  const childSiblingIds =
-    node.network.name === SINGLE_SELECT_PARENT_NAME ? node.children.map((c) => c.network.id) : null;
-
+function CakeIcon() {
   return (
-    <div className={depth > 0 ? "ml-6 mt-2" : ""}>
-      <label className="flex items-center gap-2 text-sm font-bold text-[var(--color-navy)]">
-        <input
-          type={singleSelectSiblingIds ? "radio" : "checkbox"}
-          name={singleSelectSiblingIds ? `network-group-${singleSelectSiblingIds[0]}` : undefined}
-          checked={networkIds.includes(node.network.id)}
-          onChange={() =>
-            singleSelectSiblingIds
-              ? onSelectSingleNetwork(singleSelectSiblingIds, node.network.id)
-              : onToggleNetwork(node.network.id)
-          }
-        />
-        {node.network.name}
-      </label>
-
-      {node.ministries.length > 0 && (
-        <div className="ml-6 mt-2 flex flex-col gap-1.5">
-          {node.ministries.map((m) => (
-            <label key={m.id} className="flex items-center gap-2 text-sm text-[var(--color-text-secondary)]">
-              <input type="checkbox" checked={ministryIds.includes(m.id)} onChange={() => onToggleMinistry(m.id)} />
-              {m.name}
-            </label>
-          ))}
-        </div>
-      )}
-
-      {node.children.length > 0 && (
-        <div className="mt-2 flex flex-col gap-2">
-          {node.children.map((child) => (
-            <NetworkPickerNode
-              key={child.network.id}
-              node={child}
-              depth={depth + 1}
-              singleSelectSiblingIds={childSiblingIds}
-              networkIds={networkIds}
-              ministryIds={ministryIds}
-              onToggleNetwork={onToggleNetwork}
-              onSelectSingleNetwork={onSelectSingleNetwork}
-              onToggleMinistry={onToggleMinistry}
-            />
-          ))}
-        </div>
-      )}
-    </div>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 21h16M5 21v-7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v7" />
+      <path d="M5 16c1.5 1 2.5 1 3.5 0s2.5-1 3.5 0 2.5 1 3.5 0 2.5-1 3.5 0" />
+      <path d="M12 12V8M12 5.5c.8-.9.8-1.7 0-2.5-.8.8-.8 1.6 0 2.5Z" />
+    </svg>
   );
 }
 
-const MAX_VISIBLE_NAMES = 2;
-const TOOLTIP_WIDTH = 240;
-
-/** Renders a list of names, collapsing to "+N more" once a worker belongs to enough
- * networks/ministries that spelling them all out would clog the row. Hovering (or focusing,
- * for keyboard users) the "+N more" badge reveals the rest in a floating tooltip.
- *
- * The tooltip is rendered through a portal into document.body rather than as a child of the
- * badge — otherwise the table's `overflow-x-auto` wrapper clips it, per the same CSS overflow
- * quirk documented on DropdownMenu (setting overflow-x forces overflow-y to auto too). */
-function NameListCell({ ids, nameById }: { ids: number[]; nameById: (id: number) => string }) {
-  const [open, setOpen] = useState(false);
-  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
-  const triggerRef = useRef<HTMLSpanElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const hide = () => setOpen(false);
-    window.addEventListener("scroll", hide, true);
-    window.addEventListener("resize", hide);
-    return () => {
-      window.removeEventListener("scroll", hide, true);
-      window.removeEventListener("resize", hide);
-    };
-  }, [open]);
-
-  if (ids.length === 0) return <>—</>;
-  const names = ids.map(nameById);
-  if (names.length <= MAX_VISIBLE_NAMES) return <>{names.join(", ")}</>;
-
-  const remaining = names.length - MAX_VISIBLE_NAMES;
-
-  const show = () => {
-    const rect = triggerRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    setPosition({ top: rect.bottom + 4, left: Math.min(rect.left, window.innerWidth - TOOLTIP_WIDTH - 8) });
-    setOpen(true);
-  };
-
+function PlusIcon() {
   return (
-    <span>
-      {names.slice(0, MAX_VISIBLE_NAMES).join(", ")}{" "}
-      <span
-        ref={triggerRef}
-        tabIndex={0}
-        onMouseEnter={show}
-        onMouseLeave={() => setOpen(false)}
-        onFocus={show}
-        onBlur={() => setOpen(false)}
-        className="cursor-default font-semibold text-[var(--color-text-secondary)] underline decoration-dotted underline-offset-2"
-      >
-        +{remaining} more
-      </span>
-      {open &&
-        position &&
-        createPortal(
-          <div
-            role="tooltip"
-            style={{ position: "fixed", top: position.top, left: position.left, width: TOOLTIP_WIDTH }}
-            className="z-50 rounded-md border border-[var(--color-border)] bg-[var(--color-surface)] px-3 py-2 text-sm text-[var(--color-text-primary)] shadow-lg"
-          >
-            {names.join(", ")}
-          </div>,
-          document.body,
-        )}
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  );
+}
+
+function Birthday({ value }: { value: string | null }) {
+  const label = formatBirthdayShort(value);
+  if (!label) return <span className="wk-empty">—</span>;
+  return (
+    <span className="wk-birthday">
+      <CakeIcon />
+      {label}
     </span>
   );
 }
 
+/** A worker's networks (in tree order) and ministries as chip items. */
+function chipItemsFor(u: User, networkOrder: Map<number, number>, networkById: Map<number, Network>, ministryById: Map<number, Ministry>) {
+  const networks: ChipItem[] = [...u.networkIds]
+    .sort((a, b) => (networkOrder.get(a) ?? 0) - (networkOrder.get(b) ?? 0))
+    .map((id) => ({ key: `n${id}`, kind: "network", name: networkById.get(id)?.name ?? `#${id}` }));
+  const ministries: ChipItem[] = u.ministryIds.map((id) => ({ key: `m${id}`, kind: "ministry", name: ministryById.get(id)?.name ?? `#${id}` }));
+  return { networks, ministries };
+}
+
 function PeopleWorkers() {
+  const toast = useToast();
+  const confirm = useConfirm();
+
   const [search, setSearch] = useState("");
   const [ministryFilter, setMinistryFilter] = useState("");
   const [networkFilter, setNetworkFilter] = useState("");
@@ -217,11 +85,7 @@ function PeopleWorkers() {
 
   const canManageUsers = isAdmin();
 
-  const [userModalOpen, setUserModalOpen] = useState(false);
-  const [editingUserId, setEditingUserId] = useState<number | string | null>(null);
-  const [userForm, setUserForm] = useState(emptyUserForm);
-  const [savingUser, setSavingUser] = useState(false);
-  const [userFormError, setUserFormError] = useState<string | null>(null);
+  const [modal, setModal] = useState<{ open: boolean; editing: User | null }>({ open: false, editing: null });
 
   // Which row shows the "updating" pulse — set right before a per-row mutation (save/toggle/
   // delete) and cleared once the silent reload picks it back up.
@@ -249,18 +113,16 @@ function PeopleWorkers() {
         setMinistries(ministryList);
       })
       .catch(() => {
-        // Networks/ministries only drive filters and the assignment picker below —
+        // Networks/ministries only drive filters, chips and the assignment picker —
         // if they fail to load, the worker list itself still works fine.
       });
   }, []);
 
-  const networkNameMap = useMemo(() => new Map(networks.map((n) => [n.id, n.name])), [networks]);
-  const ministryNameMap = useMemo(() => new Map(ministries.map((m) => [m.id, m.name])), [ministries]);
-  const networkNameById = (id: number) => networkNameMap.get(id) ?? `#${id}`;
-  const ministryNameById = (id: number) => ministryNameMap.get(id) ?? `#${id}`;
-
-  const networkTree = useMemo(() => buildNetworkTree(networks, ministries), [networks, ministries]);
+  const networkById = useMemo(() => new Map(networks.map((n) => [n.id, n])), [networks]);
+  const ministryById = useMemo(() => new Map(ministries.map((m) => [m.id, m])), [ministries]);
+  const networkTree: NetworkTreeNode[] = useMemo(() => buildNetworkTree(networks, ministries), [networks, ministries]);
   const networkSelectOptions = useMemo(() => flattenNetworksForSelect(networkTree), [networkTree]);
+  const networkOrder = useMemo(() => new Map(networkSelectOptions.map((o, i) => [o.id, i])), [networkSelectOptions]);
 
   // Any change to what's being shown jumps back to page 1 — otherwise a filter/search
   // change could land you on a now-empty or out-of-range page.
@@ -269,12 +131,7 @@ function PeopleWorkers() {
   const filteredUsers = useMemo(() => {
     const q = search.trim().toLowerCase();
     return users.filter((u) => {
-      if (
-        q &&
-        !u.name.toLowerCase().includes(q) &&
-        !u.email.toLowerCase().includes(q) &&
-        !u.nickname?.toLowerCase().includes(q)
-      ) {
+      if (q && !u.name.toLowerCase().includes(q) && !u.email.toLowerCase().includes(q) && !u.nickname?.toLowerCase().includes(q)) {
         return false;
       }
       if (ministryFilter && !u.ministryIds.includes(Number(ministryFilter))) return false;
@@ -283,169 +140,88 @@ function PeopleWorkers() {
     });
   }, [users, search, ministryFilter, networkFilter]);
 
-  const pagedUsers = filteredUsers.slice((usersPage - 1) * usersPageSize, usersPage * usersPageSize);
+  const pageStart = (usersPage - 1) * usersPageSize;
+  const pagedUsers = filteredUsers.slice(pageStart, pageStart + usersPageSize);
 
-  const openAddUser = () => {
-    setEditingUserId(null);
-    setUserForm(emptyUserForm);
-    setUserFormError(null);
-    setUserModalOpen(true);
-  };
+  const openAddUser = () => setModal({ open: true, editing: null });
+  const openEditUser = (u: User) => setModal({ open: true, editing: u });
+  const closeModal = () => setModal((m) => ({ ...m, open: false }));
 
-  const openEditUser = (u: User) => {
-    setEditingUserId(u.id);
-    setUserForm({
-      firstName: u.firstName,
-      middleName: u.middleName ?? "",
-      lastName: u.lastName,
-      nickname: u.nickname ?? "",
-      email: u.email,
-      birthday: u.birthday ? u.birthday.slice(0, 10) : "",
-      photoDataUrl: u.photoDataUrl,
-      ministryIds: u.ministryIds,
-      networkIds: u.networkIds,
-    });
-    setUserFormError(null);
-    setUserModalOpen(true);
-  };
-
-  const toggleMinistry = (id: number) => {
-    setUserForm((f) => {
-      const adding = !f.ministryIds.includes(id);
-      const ministryIds = adding ? [...f.ministryIds, id] : f.ministryIds.filter((x) => x !== id);
-      if (!adding) return { ...f, ministryIds };
-
-      // Picking a ministry implies membership in its network and every network above it
-      // too (e.g. JAM/VIA/TEAM -> WAN -> MDN).
-      const ministry = ministries.find((m) => m.id === id);
-      if (!ministry) return { ...f, ministryIds };
-      const impliedNetworkIds = [ministry.networkId, ...getAncestorNetworkIds(ministry.networkId, networks)].filter(
-        (nid) => !f.networkIds.includes(nid),
+  const handleSaved = async (
+    result: { kind: "updated"; user: User } | { kind: "created"; user: User; temporaryPassword: string },
+  ) => {
+    closeModal();
+    if (result.kind === "created") {
+      await loadUsers(true);
+      toast.show({ type: "success", title: "Worker saved" });
+      await infoAlert(
+        `Temporary password: ${result.temporaryPassword}\n\nShare this with ${result.user.name} so they can log in. They should change it from Settings afterward.`,
+        "Worker created",
       );
-      return { ...f, ministryIds, networkIds: [...f.networkIds, ...impliedNetworkIds] };
-    });
-  };
-
-  const toggleNetwork = (id: number) => {
-    setUserForm((f) => {
-      if (f.networkIds.includes(id)) return { ...f, networkIds: f.networkIds.filter((x) => x !== id) };
-
-      // Selecting a sub-network implies membership in every network above it too (e.g. WAN -> MDN).
-      const ancestorIds = getAncestorNetworkIds(id, networks).filter((a) => !f.networkIds.includes(a));
-      return { ...f, networkIds: [...f.networkIds, id, ...ancestorIds] };
-    });
-  };
-
-  // LGN's sub-networks are mutually exclusive (a member belongs to exactly one demographic group),
-  // so picking one replaces any other sibling already selected instead of just adding to the list.
-  const selectSingleNetwork = (siblingIds: number[], id: number) => {
-    setUserForm((f) => {
-      const ancestorIds = getAncestorNetworkIds(id, networks).filter(
-        (a) => !f.networkIds.includes(a) && !siblingIds.includes(a),
-      );
-      return {
-        ...f,
-        networkIds: [...f.networkIds.filter((x) => !siblingIds.includes(x)), id, ...ancestorIds],
-      };
-    });
-  };
-
-  const handleSaveUser = async () => {
-    if (!userForm.firstName.trim() || !userForm.lastName.trim() || !userForm.email.trim()) return;
-    setSavingUser(true);
-    setUserFormError(null);
+      return;
+    }
+    setBusyUserId(result.user.id);
     try {
-      const payload = {
-        firstName: userForm.firstName.trim(),
-        middleName: userForm.middleName.trim() || null,
-        lastName: userForm.lastName.trim(),
-        nickname: userForm.nickname.trim() || null,
-        email: userForm.email.trim(),
-        birthday: userForm.birthday || null,
-        photoDataUrl: userForm.photoDataUrl,
-        ministryIds: userForm.ministryIds,
-        networkIds: userForm.networkIds,
-      };
-
-      if (editingUserId === null) {
-        const result = await createUser(payload);
-        setUserModalOpen(false);
-        await loadUsers(true);
-        await infoAlert(
-          `Temporary password: ${result.temporaryPassword}\n\nShare this with ${result.user.name} so they can log in. They should change it from Settings afterward.`,
-          "Worker created",
-        );
-      } else {
-        await updateUser(editingUserId, payload);
-        setUserModalOpen(false);
-        setBusyUserId(editingUserId);
-        await loadUsers(true);
-        successToast("Worker updated");
-      }
-    } catch (err) {
-      setUserFormError(err instanceof Error ? err.message : "Failed to save worker");
+      await loadUsers(true);
+      toast.show({ type: "success", title: "Worker saved" });
     } finally {
-      setSavingUser(false);
       setBusyUserId(null);
     }
   };
 
   const handleResetPassword = async (u: User) => {
-    const confirmed = await confirmDialog({
+    const ok = await confirm({
       title: "Reset password?",
-      message: `This generates a new temporary password for ${u.name}. Their current password stops working immediately.`,
+      description: `This generates a new temporary password for ${u.name}. Their current password stops working immediately.`,
       confirmLabel: "Reset password",
+      danger: false,
     });
-    if (!confirmed) return;
+    if (!ok) return;
     try {
       const { temporaryPassword } = await resetUserPassword(u.id);
-      await infoAlert(
-        `Temporary password: ${temporaryPassword}\n\nShare this with ${u.name} so they can log back in.`,
-        "Password reset",
-      );
+      await infoAlert(`Temporary password: ${temporaryPassword}\n\nShare this with ${u.name} so they can log back in.`, "Password reset");
     } catch (err) {
-      await infoAlert(err instanceof Error ? err.message : "Failed to reset password", "Error");
+      toast.show({ type: "error", title: "Couldn't reset the password", message: err instanceof Error ? err.message : undefined });
     }
   };
 
   const handleToggleActive = async (u: User) => {
     const activating = !u.isActive;
-    const confirmed = await confirmDialog({
+    const ok = await confirm({
       title: activating ? "Activate account?" : "Deactivate account?",
-      message: activating
+      description: activating
         ? `${u.name} will be able to log in again.`
         : `${u.name} won't be able to log in until reactivated. If they're already logged in, their current session can stay valid for up to 8 hours.`,
       confirmLabel: activating ? "Activate" : "Deactivate",
       danger: !activating,
     });
-    if (!confirmed) return;
+    if (!ok) return;
     setBusyUserId(u.id);
     try {
       await setUserActive(u.id, activating);
       await loadUsers(true);
-      successToast(activating ? "Worker activated" : "Worker deactivated");
+      toast.show({ type: "success", title: activating ? "Worker activated" : "Worker deactivated" });
     } catch (err) {
-      await infoAlert(err instanceof Error ? err.message : "Failed to update account status", "Error");
+      toast.show({ type: "error", title: "Couldn't update the account", message: err instanceof Error ? err.message : undefined });
     } finally {
       setBusyUserId(null);
     }
   };
 
   const handleDeleteUser = async (u: User) => {
-    const confirmed = await confirmDialog({
+    const ok = await confirm({
       title: "Delete worker?",
-      message: `This permanently deletes ${u.name}'s account. This can't be undone.`,
+      description: `This permanently deletes ${u.name}'s account. This can't be undone.`,
       confirmLabel: "Delete",
-      danger: true,
     });
-    if (!confirmed) return;
+    if (!ok) return;
     setBusyUserId(u.id);
     try {
       await deleteUser(u.id);
       await loadUsers(true);
-      successToast("Worker deleted");
+      toast.show({ type: "success", title: "Worker deleted" });
     } catch (err) {
-      await infoAlert(err instanceof Error ? err.message : "Failed to delete worker", "Error");
+      toast.show({ type: "error", title: "Couldn't delete the worker", message: err instanceof Error ? err.message : undefined });
     } finally {
       setBusyUserId(null);
     }
@@ -458,272 +234,204 @@ function PeopleWorkers() {
     { label: "Delete", onSelect: () => handleDeleteUser(u), danger: true, dividerBefore: true },
   ];
 
+  const actions = (u: User) =>
+    u.id === busyUserId ? (
+      <span className="wk-kebab-slot">
+        <Spinner className="h-4 w-4 text-[var(--color-text-secondary)]" />
+      </span>
+    ) : canManageUsers ? (
+      <DropdownMenu ariaLabel={`Actions for ${u.name}`} items={buildUserMenu(u)} icon={<KebabIcon />} triggerClassName="wk-kebab" />
+    ) : (
+      <span className="wk-kebab-slot" />
+    );
+
+  const nameButton = (u: User, className: string) =>
+    canManageUsers ? (
+      <button type="button" className={`${className} wk-name-link`} onClick={() => openEditUser(u)}>
+        {u.name}
+      </button>
+    ) : (
+      <span className={className}>{u.name}</span>
+    );
+
   return (
     <AppShell headerRight={<ProfileMenu />}>
-      <div className="page-header">
-        <h1>Workers / Users</h1>
-        {canManageUsers && (
-          <Button type="button" onClick={openAddUser}>
-            + Add worker
-          </Button>
+      <div className="wk-page">
+        <div className="wk-header">
+          <div className="min-w-0">
+            <h1 className="wk-title">
+              Workers
+              {!loadingUsers && (
+                <span className="wk-count">
+                  {" "}
+                  · {users.length} {users.length === 1 ? "person" : "people"}
+                </span>
+              )}
+            </h1>
+            <p className="wk-subtitle">Everyone who serves, and the networks and ministries they belong to.</p>
+          </div>
+          {canManageUsers && (
+            <button type="button" className="wk-btn wk-btn--gold wk-add-btn" onClick={openAddUser}>
+              <PlusIcon />
+              <span className="wk-add-long">Add worker</span>
+              <span className="wk-add-short" aria-hidden="true">
+                Add
+              </span>
+            </button>
+          )}
+        </div>
+
+        <div className="wk-toolbar">
+          <label className="wk-search">
+            <TopbarSearchIcon />
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name or email"
+              aria-label="Search workers by name or email"
+            />
+          </label>
+          <div className="wk-filters">
+            <label className="wk-filter">
+              <span className="wk-filter-label">Network</span>
+              <select value={networkFilter} onChange={(e) => setNetworkFilter(e.target.value)} aria-label="Filter by network">
+                <option value="">All networks</option>
+                {networkSelectOptions.map(({ id, name, depth }) => (
+                  <option key={id} value={id}>
+                    {"  ".repeat(depth)}
+                    {depth > 0 ? "– " : ""}
+                    {name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="wk-filter">
+              <span className="wk-filter-label">Ministry</span>
+              <select value={ministryFilter} onChange={(e) => setMinistryFilter(e.target.value)} aria-label="Filter by ministry">
+                <option value="">All ministries</option>
+                {ministries.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+        </div>
+
+        {usersError && <p className="error">{usersError}</p>}
+
+        {loadingUsers ? (
+          <div className="flex flex-col gap-2" aria-hidden="true">
+            {[0, 1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-[72px] w-full rounded-[16px]" />
+            ))}
+          </div>
+        ) : filteredUsers.length === 0 ? (
+          <p className="helper-text">No workers match your search.</p>
+        ) : (
+          <>
+            {/* Desktop: one table card */}
+            <div className="wk-table" role="table" aria-label="Workers">
+              <div className="wk-row wk-row--head" role="row">
+                <span role="columnheader">Name</span>
+                <span role="columnheader">Networks</span>
+                <span role="columnheader">Ministries</span>
+                <span role="columnheader">Birthday</span>
+                <span role="columnheader">
+                  <span className="sr-only">Actions</span>
+                </span>
+              </div>
+              {pagedUsers.map((u, i) => {
+                const chips = chipItemsFor(u, networkOrder, networkById, ministryById);
+                return (
+                  <div key={u.id} role="row" className={["wk-row", u.id === busyUserId && "wk-row--busy"].filter(Boolean).join(" ")}>
+                    <div role="cell" className="wk-name-cell">
+                      <InitialAvatar name={u.name} photoUrl={u.photoDataUrl} size="row" tone={(pageStart + i) % 2 === 0 ? "sand" : "mist"} />
+                      <div className="min-w-0">
+                        <div className="wk-name-line">
+                          {nameButton(u, "wk-name")}
+                          {!u.isActive && <span className="wk-inactive">Deactivated</span>}
+                        </div>
+                        <p className="wk-email">{u.email}</p>
+                      </div>
+                    </div>
+                    <div role="cell">
+                      <ChipList items={chips.networks} />
+                    </div>
+                    <div role="cell">
+                      <ChipList items={chips.ministries} />
+                    </div>
+                    <div role="cell">
+                      <Birthday value={u.birthday} />
+                    </div>
+                    <div role="cell" className="wk-actions-cell">
+                      {actions(u)}
+                    </div>
+                  </div>
+                );
+              })}
+              <Pagination
+                page={usersPage}
+                pageSize={usersPageSize}
+                total={filteredUsers.length}
+                onPageChange={setUsersPage}
+                onPageSizeChange={handleUsersPageSizeChange}
+              />
+            </div>
+
+            {/* Mobile: fixed-height cards */}
+            <ul className="wk-cards">
+              {pagedUsers.map((u, i) => {
+                const chips = chipItemsFor(u, networkOrder, networkById, ministryById);
+                const birthday = formatBirthdayShort(u.birthday);
+                return (
+                  <li key={u.id} className={["wk-card", u.id === busyUserId && "wk-row--busy"].filter(Boolean).join(" ")}>
+                    <InitialAvatar name={u.name} photoUrl={u.photoDataUrl} size="row" tone={(pageStart + i) % 2 === 0 ? "sand" : "mist"} />
+                    <div className="wk-card-main">
+                      <div className="wk-name-line">
+                        {nameButton(u, "wk-name wk-name--card")}
+                        {!u.isActive && <span className="wk-inactive">Deactivated</span>}
+                      </div>
+                      <p className="wk-email">{u.email}</p>
+                      <div className="wk-card-chips">
+                        <ChipList items={[...chips.networks, ...chips.ministries]} empty="No network yet" />
+                        {birthday && (
+                          <span className="wk-birthday wk-birthday--end">
+                            <CakeIcon />
+                            {birthday}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {actions(u)}
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="wk-cards-pagination">
+              <Pagination
+                page={usersPage}
+                pageSize={usersPageSize}
+                total={filteredUsers.length}
+                onPageChange={setUsersPage}
+                onPageSizeChange={handleUsersPageSizeChange}
+              />
+            </div>
+          </>
         )}
       </div>
 
-      <FilterBar
-        primary={
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name or email"
-            className="h-11 w-full rounded-sm border border-[var(--color-border)] bg-[var(--color-surface)] px-4 text-sm focus:border-[var(--color-gold)] focus:shadow-[0_0_0_3px_rgba(242,183,5,0.25)] sm:max-w-xs"
-          />
-        }
-        activeCount={[networkFilter, ministryFilter].filter(Boolean).length}
-      >
-        <SelectField
-          label="Network"
-          value={networkFilter}
-          onChange={(e) => setNetworkFilter(e.target.value)}
-          className="sm:max-w-[220px]"
-        >
-          <option value="">All networks</option>
-          {networkSelectOptions.map(({ id, name, depth }) => (
-            <option key={id} value={id}>
-              {"  ".repeat(depth)}
-              {depth > 0 ? "– " : ""}
-              {name}
-            </option>
-          ))}
-        </SelectField>
-        <SelectField
-          label="Ministry"
-          value={ministryFilter}
-          onChange={(e) => setMinistryFilter(e.target.value)}
-          className="sm:max-w-[220px]"
-        >
-          <option value="">All ministries</option>
-          {ministries.map((m) => (
-            <option key={m.id} value={m.id}>
-              {m.name}
-            </option>
-          ))}
-        </SelectField>
-      </FilterBar>
-
-      {usersError && <p className="error mb-3">{usersError}</p>}
-      {loadingUsers ? (
-        <div className="flex flex-col gap-2">
-          <Skeleton className="h-14 w-full rounded-md" />
-          <Skeleton className="h-14 w-full rounded-md" />
-          <Skeleton className="h-14 w-full rounded-md" />
-        </div>
-      ) : filteredUsers.length === 0 ? (
-        <p className="helper-text">No workers match your search.</p>
-      ) : (
-        <Card className="!p-0 card-bleed">
-          {/* Desktop: column table. */}
-          <div className="hidden overflow-x-auto min-[900px]:block">
-            <div className="min-w-[760px]">
-              <div className="grid grid-cols-[2fr_1.4fr_1.6fr_1fr_48px] gap-3 border-b border-[var(--color-border)] px-4 py-2.5 text-xs font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                <span>Name</span>
-                <span>Network</span>
-                <span>Ministry</span>
-                <span>Birthday</span>
-                <span />
-              </div>
-              {pagedUsers.map((u) => (
-                <div
-                  key={u.id}
-                  className={[
-                    "grid grid-cols-[2fr_1.4fr_1.6fr_1fr_48px] items-center gap-3 border-b border-[var(--color-border)] px-4 py-3 last:border-b-0 transition-opacity",
-                    u.id === busyUserId && "pointer-events-none animate-pulse opacity-60",
-                  ]
-                    .filter(Boolean)
-                    .join(" ")}
-                >
-                  <div className="flex items-center gap-3">
-                    <InitialAvatar name={u.name} photoUrl={u.photoDataUrl} />
-                    <div className="min-w-0">
-                      <p className="truncate font-semibold text-[var(--color-text-primary)]">{u.name}</p>
-                      <p className="truncate text-xs text-[var(--color-text-secondary)]">{u.email}</p>
-                    </div>
-                    {!u.isActive && (
-                      <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-[0.7rem] font-bold text-[var(--color-text-secondary)]">
-                        Deactivated
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-sm text-[var(--color-text-secondary)]">
-                    <NameListCell ids={u.networkIds} nameById={networkNameById} />
-                  </div>
-                  <div className="text-sm text-[var(--color-text-secondary)]">
-                    <NameListCell ids={u.ministryIds} nameById={ministryNameById} />
-                  </div>
-                  <div className="text-sm text-[var(--color-text-secondary)]">{formatBirthday(u.birthday)}</div>
-                  {u.id === busyUserId ? (
-                    <Spinner className="h-4 w-4 text-[var(--color-text-secondary)]" />
-                  ) : canManageUsers ? (
-                    <DropdownMenu ariaLabel={`Actions for ${u.name}`} items={buildUserMenu(u)} />
-                  ) : (
-                    <span />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Mobile: stacked cards — a grid row would force sideways scrolling to see every field. */}
-          <ul className="min-[900px]:hidden">
-            {pagedUsers.map((u) => (
-              <li
-                key={u.id}
-                className={[
-                  "border-b border-[var(--color-border)] px-4 py-3 last:border-b-0 transition-opacity",
-                  u.id === busyUserId && "pointer-events-none animate-pulse opacity-60",
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-              >
-                <div className="flex items-start gap-3">
-                  <InitialAvatar name={u.name} photoUrl={u.photoDataUrl} />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="truncate font-semibold text-[var(--color-text-primary)]">{u.name}</p>
-                      {!u.isActive && (
-                        <span className="shrink-0 rounded-full bg-black/5 px-2 py-0.5 text-[0.7rem] font-bold text-[var(--color-text-secondary)]">
-                          Deactivated
-                        </span>
-                      )}
-                    </div>
-                    <div className="flex items-baseline gap-1.5 text-xs text-[var(--color-text-secondary)]">
-                      <p className="min-w-0 flex-1 truncate">{u.email}</p>
-                      {u.birthday && <p className="shrink-0">{formatBirthday(u.birthday)}</p>}
-                    </div>
-                    <dl className="mt-1.5 flex flex-col gap-1 text-sm">
-                      <div className="flex flex-wrap items-baseline gap-x-1.5">
-                        <dt className="shrink-0 text-[0.68rem] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                          Network
-                        </dt>
-                        <dd className="text-[var(--color-text-primary)]">
-                          <NameListCell ids={u.networkIds} nameById={networkNameById} />
-                        </dd>
-                      </div>
-                      <div className="flex flex-wrap items-baseline gap-x-1.5">
-                        <dt className="shrink-0 text-[0.68rem] font-bold uppercase tracking-wide text-[var(--color-text-secondary)]">
-                          Ministry
-                        </dt>
-                        <dd className="text-[var(--color-text-primary)]">
-                          <NameListCell ids={u.ministryIds} nameById={ministryNameById} />
-                        </dd>
-                      </div>
-                    </dl>
-                  </div>
-                  {u.id === busyUserId ? (
-                    <Spinner className="mt-1 h-4 w-4 shrink-0 text-[var(--color-text-secondary)]" />
-                  ) : (
-                    canManageUsers && <DropdownMenu ariaLabel={`Actions for ${u.name}`} items={buildUserMenu(u)} />
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-
-          <Pagination
-            page={usersPage}
-            pageSize={usersPageSize}
-            total={filteredUsers.length}
-            onPageChange={setUsersPage}
-            onPageSizeChange={handleUsersPageSizeChange}
-          />
-        </Card>
-      )}
-
-      <Modal
-        open={userModalOpen}
-        onClose={() => setUserModalOpen(false)}
-        title={editingUserId === null ? "Add worker" : "Edit worker"}
-        size="lg"
-        footer={
-          <>
-            <Button type="button" variant="secondary" onClick={() => setUserModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleSaveUser}
-              disabled={savingUser || !userForm.firstName.trim() || !userForm.lastName.trim() || !userForm.email.trim()}
-            >
-              {savingUser ? "Saving..." : editingUserId === null ? "Add worker" : "Save changes"}
-            </Button>
-          </>
-        }
-      >
-        <div className="flex flex-col gap-4">
-          <PhotoPicker
-            name={`${userForm.firstName} ${userForm.lastName}`.trim() || "Worker"}
-            photoUrl={userForm.photoDataUrl}
-            onChange={(photoDataUrl) => setUserForm((f) => ({ ...f, photoDataUrl }))}
-          />
-          <TextField
-            label="First name"
-            value={userForm.firstName}
-            onChange={(e) => setUserForm((f) => ({ ...f, firstName: e.target.value }))}
-            required
-          />
-          <TextField
-            label="Middle name (optional)"
-            value={userForm.middleName}
-            onChange={(e) => setUserForm((f) => ({ ...f, middleName: e.target.value }))}
-          />
-          <TextField
-            label="Last name"
-            value={userForm.lastName}
-            onChange={(e) => setUserForm((f) => ({ ...f, lastName: e.target.value }))}
-            required
-          />
-          <TextField
-            label="Nickname (optional)"
-            value={userForm.nickname}
-            onChange={(e) => setUserForm((f) => ({ ...f, nickname: e.target.value }))}
-          />
-          <TextField
-            label="Email"
-            type="email"
-            value={userForm.email}
-            onChange={(e) => setUserForm((f) => ({ ...f, email: e.target.value }))}
-            required
-          />
-          <TextField
-            label="Birthday"
-            type="date"
-            value={userForm.birthday}
-            onChange={(e) => setUserForm((f) => ({ ...f, birthday: e.target.value }))}
-          />
-
-          <div>
-            <p className="section-title">Networks &amp; ministries</p>
-            <div className="flex flex-col gap-3">
-              {networkTree.map((root) => (
-                <div key={root.network.id} className="rounded-md border border-[var(--color-border)] p-3">
-                  <NetworkPickerNode
-                    node={root}
-                    depth={0}
-                    singleSelectSiblingIds={null}
-                    networkIds={userForm.networkIds}
-                    ministryIds={userForm.ministryIds}
-                    onToggleNetwork={toggleNetwork}
-                    onSelectSingleNetwork={selectSingleNetwork}
-                    onToggleMinistry={toggleMinistry}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {userFormError && <p className="error">{userFormError}</p>}
-        </div>
-      </Modal>
+      <WorkerModal
+        open={modal.open}
+        editing={modal.editing}
+        networks={networks}
+        ministries={ministries}
+        tree={networkTree}
+        onClose={closeModal}
+        onSaved={(r) => void handleSaved(r)}
+      />
     </AppShell>
   );
 }

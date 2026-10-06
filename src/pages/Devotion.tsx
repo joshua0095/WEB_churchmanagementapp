@@ -5,6 +5,7 @@ import {
   createDevotion,
   deleteDevotion,
   getBibleVersions,
+  versionShortLabel,
   getDevotions,
   updateDevotion,
   type Devotion as ApiDevotion,
@@ -400,7 +401,10 @@ function Devotion() {
     const versionId = getBibleVersionId("devotion");
     if (!versionId) return;
     getBibleVersions()
-      .then((versions) => setVersionLabel(versions.find((v) => v.id === versionId)?.abbreviation ?? null))
+      .then((versions) => {
+        const version = versions.find((v) => v.id === versionId);
+        setVersionLabel(version ? versionShortLabel(version) : null);
+      })
       .catch(() => {});
   }, []);
 
@@ -620,10 +624,11 @@ function Devotion() {
   const handleShare = async (devo: Devo) => {
     try {
       await createAnnouncement({
-        eyebrow: devo.verse,
+        eyebrow: null,
         title: truncate(devo.observation || devo.scripture, 80),
-        content: null,
+        content: devo.verse,
         imageDataUrl: null,
+        eventDate: null,
       });
       toast.show({ type: "success", title: "Shared to Announcements", message: devo.verse });
     } catch (err) {
