@@ -621,6 +621,22 @@ export async function sendAnnouncement(id: number): Promise<{ sentCount: number;
   return res.json();
 }
 
+/** An active worker whose birthday is today (Manila time) — Home's "Birthdays today" card. */
+export interface BirthdayToday {
+  id: number;
+  name: string;
+  firstName: string;
+  photoDataUrl: string | null;
+}
+
+export async function getTodaysBirthdays(): Promise<BirthdayToday[]> {
+  const res = await apiFetch("/api/birthdays/today");
+  if (!res.ok) {
+    throw new Error(`Failed to fetch today's birthdays (${res.status})`);
+  }
+  return res.json();
+}
+
 /** The theme-of-the-month poster on Home. `month` is "yyyy-MM". */
 export interface MonthlyThemeInfo {
   month: string;

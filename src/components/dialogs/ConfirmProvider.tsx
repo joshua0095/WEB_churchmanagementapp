@@ -23,7 +23,7 @@ interface PendingConfirm {
 }
 
 /** Mount once at the app root. Renders the single shared confirm dialog (variant="confirm" —
- * Esc/backdrop click do nothing, per Modal's own rule for that variant); useConfirm() is how
+ * Esc does nothing, per Modal's own rule for that variant); useConfirm() is how
  * the rest of the app asks for it. */
 export function ConfirmProvider({ children }: { children: ReactNode }) {
   const [pending, setPending] = useState<PendingConfirm | null>(null);

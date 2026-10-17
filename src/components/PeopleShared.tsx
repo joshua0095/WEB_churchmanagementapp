@@ -129,7 +129,6 @@ function PhotoCropModal({ file: initialFile, onCancel, onSave }: PhotoCropModalP
       open
       onClose={onCancel}
       title="Crop photo"
-      closeOnBackdropClick={false}
       footer={
         <>
           <Button

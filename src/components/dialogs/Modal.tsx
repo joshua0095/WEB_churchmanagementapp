@@ -10,7 +10,7 @@ export interface ModalProps {
   open: boolean;
   onClose: () => void;
   /** "form" (default): a titled panel with a close button and a body for arbitrary fields.
-   * "confirm": a short alertdialog with an icon tile — Esc/backdrop click do nothing, the
+   * "confirm": a short alertdialog with an icon tile — Esc does nothing, the
    * person must pick a footer button. "success": a celebratory centered panel for a big
    * moment (see useConfirm/ToastProvider for everyday confirms/saves instead). */
   variant?: ModalVariant;
@@ -46,8 +46,8 @@ const FOCUSABLE_SELECTOR = "button:not([disabled]), input:not([disabled]), selec
 
 /** Centered dialog on desktop (≥1024px), a bottom sheet with a drag handle on mobile.
  * Rendered through a portal; traps focus while open and returns it to whatever had focus
- * before opening. Esc and a backdrop click close "form"/"success" but not "confirm" (that
- * variant demands an explicit button choice) — see useConfirm for the common case. */
+ * before opening. A backdrop click never closes it; Esc closes "form"/"success" but not
+ * "confirm" (that variant demands an explicit button choice) — see useConfirm for the common case. */
 function Modal({ open, onClose, variant = "form", size, title, description, children, footer, headerExtra, bodyClassName, icon, danger = true }: ModalProps) {
   const resolvedSize = size ?? (variant === "form" ? "md" : "sm");
   const dismissible = variant !== "confirm";
@@ -125,12 +125,8 @@ function Modal({ open, onClose, variant = "form", size, title, description, chil
     variant === "confirm" ? (icon ?? <TrashTileIcon />) : variant === "success" ? (icon ?? <CheckThinIcon strokeWidth={2.6} />) : null;
 
   return createPortal(
-    <div
-      className={["modal-backdrop", visible && "modal-backdrop--open"].filter(Boolean).join(" ")}
-      onClick={(e) => {
-        if (e.target === e.currentTarget && dismissible) onClose();
-      }}
-    >
+    // No close on backdrop click — a stray tap outside shouldn't throw away what's been typed.
+    <div className={["modal-backdrop", visible && "modal-backdrop--open"].filter(Boolean).join(" ")}>
       <div
         ref={modalRef}
         role={variant === "confirm" ? "alertdialog" : "dialog"}

@@ -14,12 +14,10 @@ interface ModalProps {
    * the `sm` breakpoint (640px) instead of shrinking into a cramped card.
    */
   size?: "md" | "lg";
-  /** Set to false to require the close button or Escape — useful for forms where an
-   * accidental outside click shouldn't discard what's been typed. Defaults to true. */
-  closeOnBackdropClick?: boolean;
 }
 
-/** Centered dialog with a backdrop; closes on backdrop click or Escape. */
+/** Centered dialog with a backdrop; closes on the close button or Escape. A backdrop click
+ * does nothing, so an accidental outside click can't discard what's been typed. */
 function Modal({
   open,
   onClose,
@@ -27,7 +25,6 @@ function Modal({
   children,
   footer,
   size = "md",
-  closeOnBackdropClick = true,
 }: ModalProps) {
   useEffect(() => {
     if (!open) return;
@@ -60,7 +57,6 @@ function Modal({
     <div className={large ? "fixed inset-0 z-[110] sm:flex sm:items-center sm:justify-center sm:p-4" : "fixed inset-0 z-[110] flex items-center justify-center p-4"}>
       <div
         className={large ? "hidden bg-black/50 sm:fixed sm:inset-0 sm:block" : "absolute inset-0 bg-black/50"}
-        onClick={closeOnBackdropClick ? onClose : undefined}
         aria-hidden="true"
       />
       <div

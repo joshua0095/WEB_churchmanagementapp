@@ -9,10 +9,12 @@ import {
   getDevotions,
   getMe,
   getMonthlyThemes,
+  getTodaysBirthdays,
   getVerseOfTheDay,
   monthlyThemeImageSrc,
   type Announcement,
   type AttendanceEvent,
+  type BirthdayToday,
   type MonthlyThemeInfo,
   type MonthlyThemeOverview,
   type VerseOfTheDay,
@@ -21,8 +23,9 @@ import { canAccessModule, isAdmin } from "../auth";
 import { ThemeCard } from "../components/announcements/HomeCards";
 import MonthlyThemeModal from "../components/announcements/MonthlyThemeModal";
 import ThemeNotice, { themeNoticeFor } from "../components/announcements/ThemeNotice";
+import { InitialAvatar } from "../components/PeopleShared";
 import { AnnouncementCarousel, AppShell, ProfileMenu, Skeleton } from "../components/ui";
-import { ChurchIcon, NavAnnouncementsIcon, NavDevotionIcon } from "../components/ui/shellIcons";
+import { CakeIcon, ChurchIcon, NavAnnouncementsIcon, NavDevotionIcon } from "../components/ui/shellIcons";
 import { formatThemeMonth, manilaMonth, themeAltText } from "../monthlyTheme";
 import { getBibleVersionId } from "../preferences";
 import sanctuaryPhoto from "../assets/login-bg.jpg";
@@ -146,6 +149,44 @@ function WalkCard({ icon, title, status, action }: WalkCardProps) {
   );
 }
 
+/** Shown only when at least one worker has a birthday today. Speaks to the viewer directly
+ * when it's their own birthday. */
+function BirthdayCard({ people, viewerId }: { people: BirthdayToday[]; viewerId: number | null }) {
+  const me = people.find((p) => p.id === viewerId);
+  const others = people.filter((p) => p.id !== viewerId);
+  return (
+    <section className="home-card home-bday" aria-labelledby="home-bday-title">
+      <div className="home-bday-head">
+        <span className="home-walk-icon home-bday-icon">
+          <CakeIcon />
+        </span>
+        <div className="min-w-0">
+          <p className="home-eyebrow">Birthdays today</p>
+          <h2 id="home-bday-title" className="home-bday-title">
+            {me ? `Happy birthday, ${me.firstName}! 🎉` : "Let's celebrate!"}
+          </h2>
+          <p className="home-bday-text">
+            {me
+              ? "The whole church family thanks God for you today. May this new year be full of His grace and joy."
+              : `Send ${others.length === 1 ? "a greeting" : "them a greeting"} and lift ${others.length === 1 ? "them" : "each of them"} up in prayer today.`}
+          </p>
+        </div>
+      </div>
+      {others.length > 0 && (
+        <ul className="home-bday-list" aria-label={me ? "Also celebrating today" : "Celebrating today"}>
+          {me && <li className="home-bday-also">Also celebrating today</li>}
+          {others.map((p) => (
+            <li key={p.id} className="home-bday-person">
+              <InitialAvatar name={p.name} photoUrl={p.photoDataUrl} size="md" tone="sand" />
+              <span className="home-bday-name">{p.name}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function Home() {
   const canAttendance = isAdmin() || canAccessModule("Attendance");
   const canAnnouncements = isAdmin() || canAccessModule("Announcements");
@@ -167,6 +208,7 @@ function Home() {
   // Only fetched for people who manage announcements — drives the "theme isn't set" notice.
   const [themeOverview, setThemeOverview] = useState<MonthlyThemeOverview | null>(null);
   const [themeModalMonth, setThemeModalMonth] = useState<string | null>(null);
+  const [birthdays, setBirthdays] = useState<BirthdayToday[]>([]);
 
   useEffect(() => {
     getMe()
@@ -218,6 +260,12 @@ function Home() {
   useEffect(() => {
     loadTheme();
   }, [loadTheme]);
+
+  useEffect(() => {
+    getTodaysBirthdays()
+      .then(setBirthdays)
+      .catch(() => {}); // no card is the same as no birthdays — nothing else depends on it
+  }, []);
 
   useEffect(() => {
     getDevotions()
@@ -285,6 +333,8 @@ function Home() {
             )}
           </div>
         </section>
+
+        {birthdays.length > 0 && <BirthdayCard people={birthdays} viewerId={userKey ? Number(userKey) : null} />}
 
         {/* 2. Announcements + theme of the month */}
         <div className={theme ? "home-row" : "home-row home-row--single"}>

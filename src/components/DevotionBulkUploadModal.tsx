@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import { BulkDevotionUploadError, bulkCreateDevotions, getBulkDevotionWorkers, type BulkWorkerOption } from "../api";
 import { BULK_TEMPLATE, parseBulkDevotions, toRequestRows, type ParsedDevotion } from "../utils/devotionBulkUpload";
-import { Modal, useToast } from "./dialogs";
-import { Button, SelectField } from "./ui";
+import { Modal, useConfirm, useToast } from "./dialogs";
+import { Button, SegmentedControl, SelectField } from "./ui";
+import { CalendarIcon } from "./ui/icons";
 
 interface DevotionBulkUploadModalProps {
   open: boolean;
@@ -12,6 +13,12 @@ interface DevotionBulkUploadModalProps {
 }
 
 const MAX_FILE_BYTES = 2 * 1024 * 1024;
+
+type Source = "file" | "paste";
+const SOURCE_OPTIONS: { value: Source; label: string }[] = [
+  { value: "file", label: "Upload file" },
+  { value: "paste", label: "Paste text" },
+];
 
 function downloadTemplate() {
   const url = URL.createObjectURL(new Blob([BULK_TEMPLATE], { type: "text/plain;charset=utf-8" }));
@@ -31,14 +38,33 @@ function formatPreviewDate(iso: string): string {
   });
 }
 
-/** Admin/MIS: import one worker's devotions from a .txt copy of their journal (format in utils/devotionBulkUpload). */
+/** "Sep 1, 2026", "Sep 1 – Sep 30, 2026", or "Dec 1, 2025 – Jan 15, 2026" across years. */
+function formatDateSpan(isoDates: string[]): string {
+  const sorted = [...isoDates].sort();
+  const toDate = (iso: string) => new Date(`${iso}T00:00:00`);
+  const full = (iso: string) => toDate(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+  const first = sorted[0];
+  const last = sorted[sorted.length - 1];
+  if (first === last) return full(first);
+  if (first.slice(0, 4) === last.slice(0, 4)) {
+    return `${toDate(first).toLocaleDateString("en-US", { month: "short", day: "numeric" })} – ${full(last)}`;
+  }
+  return `${full(first)} – ${full(last)}`;
+}
+
+/** Admin/MIS: import one worker's devotions from a .txt copy of their journal, or the same text pasted
+ * in (format in utils/devotionBulkUpload). Pasted text is checked as it's typed. */
 function DevotionBulkUploadModal({ open, onClose, onImported }: DevotionBulkUploadModalProps) {
   const toast = useToast();
+  const confirm = useConfirm();
   const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [workers, setWorkers] = useState<BulkWorkerOption[] | null>(null);
   const [workerId, setWorkerId] = useState("");
+  const [source, setSource] = useState<Source>("file");
   const [fileName, setFileName] = useState<string | null>(null);
-  const [fileText, setFileText] = useState<string | null>(null);
+  /** The text the preview rows were parsed from — the chosen file's contents, or the pasted text. */
+  const [sourceText, setSourceText] = useState<string | null>(null);
   const [rows, setRows] = useState<ParsedDevotion[] | null>(null);
   const [fileError, setFileError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -53,7 +79,7 @@ function DevotionBulkUploadModal({ open, onClose, onImported }: DevotionBulkUplo
 
   const clearFile = () => {
     setFileName(null);
-    setFileText(null);
+    setSourceText(null);
     setRows(null);
     setFileError(null);
     setSkipDuplicates(false);
@@ -63,7 +89,51 @@ function DevotionBulkUploadModal({ open, onClose, onImported }: DevotionBulkUplo
     if (uploading) return;
     clearFile();
     setWorkerId("");
+    setSource("file");
     onClose();
+  };
+
+  const switchSource = (next: Source) => {
+    if (next === source) return;
+    clearFile();
+    setSource(next);
+  };
+
+  /** Re-parses on every edit, so the preview (and its problems) always matches the text. */
+  const handlePaste = (text: string) => {
+    setSourceText(text);
+    setFileError(null);
+    if (!text.trim()) {
+      setRows(null);
+      return;
+    }
+    const parsed = parseBulkDevotions(text);
+    if (parsed.length === 0) {
+      setRows(null);
+      setFileError('No devotions found yet. Each one should start with its date, like "September 1".');
+      return;
+    }
+    setRows(parsed);
+  };
+
+  /** A file with problems can be fixed right here instead of editing it and choosing it again. */
+  const editFileAsText = () => {
+    setFileName(null);
+    // The textarea holds "\n" line endings; match them so jumpToLine's offsets line up.
+    setSourceText((text) => text?.replace(/\r\n/g, "\n") ?? null);
+    setSource("paste");
+  };
+
+  /** Selects a devotion's date line in the textarea so the problem is easy to find. */
+  const jumpToLine = (line: number) => {
+    const el = textareaRef.current;
+    if (!el || sourceText === null) return;
+    const lines = sourceText.split("\n");
+    const start = lines.slice(0, line - 1).reduce((n, l) => n + l.length + 1, 0);
+    el.focus();
+    el.setSelectionRange(start, start + (lines[line - 1]?.length ?? 0));
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 20;
+    el.scrollTop = Math.max(0, (line - 3) * lineHeight);
   };
 
   const handleFile = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -82,7 +152,7 @@ function DevotionBulkUploadModal({ open, onClose, onImported }: DevotionBulkUplo
       setFileError('No devotions found in that file. Each one should start with its date, like "September 1".');
       return;
     }
-    setFileText(text);
+    setSourceText(text);
     setRows(parsed);
   };
 
@@ -96,6 +166,25 @@ function DevotionBulkUploadModal({ open, onClose, onImported }: DevotionBulkUplo
 
   const handleImport = async () => {
     if (!worker || !rows || !canImport) return;
+
+    // Last check before saving: whose journal these land in, and which dates they cover.
+    const importDates = rows
+      .filter((r) => !(skipDuplicates && r.duplicate))
+      .map((r) => r.isoDate)
+      .filter((d): d is string => d !== null);
+    const ok = await confirm({
+      title: `Add ${importCount} devotion${importCount === 1 ? "" : "s"} for ${worker.name}?`,
+      description: `They'll be added to ${worker.name}'s devotions for ${formatDateSpan(importDates)}.${
+        skipDuplicates && duplicateCount > 0
+          ? ` ${duplicateCount} with a duplicate date will be skipped.`
+          : ""
+      }`,
+      confirmLabel: "Import",
+      danger: false,
+      icon: <CalendarIcon />,
+    });
+    if (!ok) return;
+
     setUploading(true);
     try {
       const { imported, skipped } = await bulkCreateDevotions(worker.id, toRequestRows(rows), skipDuplicates);
@@ -106,6 +195,7 @@ function DevotionBulkUploadModal({ open, onClose, onImported }: DevotionBulkUplo
       });
       clearFile();
       setWorkerId("");
+      setSource("file");
       onImported();
       onClose();
     } catch (err) {
@@ -147,7 +237,7 @@ function DevotionBulkUploadModal({ open, onClose, onImported }: DevotionBulkUplo
       onClose={close}
       size="lg"
       title="Bulk upload devotions"
-      description="Add many devotions for one worker at once from a text file."
+      description="Add many devotions for one worker at once from a text file or pasted text."
       footer={
         <>
           <Button type="button" variant="outline" onClick={close} disabled={uploading}>
@@ -166,7 +256,7 @@ function DevotionBulkUploadModal({ open, onClose, onImported }: DevotionBulkUplo
           onChange={(e) => {
             setWorkerId(e.target.value);
             // Server errors like "already has a devotion that day" belonged to the old worker.
-            if (fileText !== null) setRows(parseBulkDevotions(fileText));
+            if (sourceText !== null && rows) setRows(parseBulkDevotions(sourceText));
           }}
           disabled={!workers || uploading}
         >
@@ -186,26 +276,69 @@ function DevotionBulkUploadModal({ open, onClose, onImported }: DevotionBulkUplo
           </p>
         </div>
 
-        <div className="flex flex-wrap gap-3">
-          <Button type="button" variant="secondary" onClick={downloadTemplate}>
-            Download template
-          </Button>
-          <Button type="button" variant="secondary" onClick={() => inputRef.current?.click()} disabled={uploading}>
-            {fileName ? "Choose a different file" : "Choose .txt file"}
-          </Button>
-          <input ref={inputRef} type="file" accept=".txt,text/plain" className="hidden" onChange={handleFile} />
-        </div>
+        <SegmentedControl
+          aria-label="How to add devotions"
+          options={SOURCE_OPTIONS}
+          value={source}
+          onChange={switchSource}
+          disabled={uploading}
+        />
 
-        {fileName && <p className="m-0 text-sm font-semibold text-[var(--color-text-primary)]">{fileName}</p>}
+        {source === "file" ? (
+          <>
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" variant="secondary" onClick={downloadTemplate}>
+                Download template
+              </Button>
+              <Button type="button" variant="secondary" onClick={() => inputRef.current?.click()} disabled={uploading}>
+                {fileName ? "Choose a different file" : "Choose .txt file"}
+              </Button>
+              <input ref={inputRef} type="file" accept=".txt,text/plain" className="hidden" onChange={handleFile} />
+            </div>
+            {fileName && <p className="m-0 text-sm font-semibold text-[var(--color-text-primary)]">{fileName}</p>}
+          </>
+        ) : (
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="bulk-devotion-text" className="text-sm font-semibold text-[var(--color-text-primary)]">
+                Devotions text
+              </label>
+              {!sourceText && (
+                <Button type="button" variant="outline" onClick={() => handlePaste(BULK_TEMPLATE)} disabled={uploading}>
+                  Paste an example
+                </Button>
+              )}
+            </div>
+            <textarea
+              id="bulk-devotion-text"
+              ref={textareaRef}
+              className="ui-field-input min-h-56 resize-y font-mono text-xs leading-5"
+              value={sourceText ?? ""}
+              onChange={(e) => handlePaste(e.target.value)}
+              placeholder={"September 1\nScripture:\n…\nBook 1:1 (NIV)\nObservation:\n…\nApplication:\n…\nPrayer:\n…"}
+              spellCheck={false}
+              disabled={uploading}
+              aria-invalid={invalidCount > 0 ? true : undefined}
+            />
+          </div>
+        )}
         {fileError && <p className="error m-0">{fileError}</p>}
 
         {rows && (
           <>
             {invalidCount > 0 ? (
               <p className="error m-0">
-                {`${invalidCount} of ${rows.length} devotion${rows.length === 1 ? "" : "s"} ${invalidCount === 1 ? "has a problem. Fix it" : "have problems. Fix them"} in the file and choose it again — nothing has been saved.`}
+                {`${invalidCount} of ${rows.length} devotion${rows.length === 1 ? "" : "s"} ${invalidCount === 1 ? "has a problem. Fix it" : "have problems. Fix them"} ${source === "paste" ? "in the text above — click a row to jump to it" : "in the file and choose it again"}. Nothing has been saved.`}
                 {duplicateCount > 0 &&
                   ` (${duplicateCount} more ${duplicateCount === 1 ? "has a duplicate date" : "have duplicate dates"} — you'll be able to skip ${duplicateCount === 1 ? "it" : "those"}.)`}
+                {source === "file" && (
+                  <>
+                    {" "}
+                    <button type="button" className="font-semibold underline" onClick={editFileAsText} disabled={uploading}>
+                      Fix it here instead
+                    </button>
+                  </>
+                )}
               </p>
             ) : duplicateCount > 0 ? (
               <div className="flex flex-col gap-2 rounded-md border border-amber-300 bg-amber-50 px-4 py-3">
@@ -245,8 +378,11 @@ function DevotionBulkUploadModal({ open, onClose, onImported }: DevotionBulkUplo
                   {rows.map((r) => (
                     <tr
                       key={r.line}
+                      onClick={source === "paste" ? () => jumpToLine(r.line) : undefined}
+                      title={source === "paste" ? `Go to line ${r.line}` : undefined}
                       className={[
                         "border-t border-[var(--color-border)] align-top",
+                        source === "paste" ? "cursor-pointer hover:bg-black/[0.03]" : "",
                         r.errors.length > 0 ? "bg-red-50" : r.duplicate ? "bg-amber-50" : "",
                         r.errors.length === 0 && r.duplicate && skipDuplicates ? "opacity-60" : "",
                       ].join(" ")}

@@ -10,14 +10,27 @@ import type { BulkDevotionRow } from "../api";
  */
 export const BULK_TEMPLATE = `September 1
 Scripture:
-Come to me, all you who are weary and burdened, and I will give you rest. Take my yoke upon you and learn from me, for I am gentle and humble in heart, and you will find rest for your souls.
-Matthew 11:28–29 (NIV)
+Write the Bible passage here.
+Book 1:1 (NIV)
 Observation:
-Jesus invites the tired rather than the impressive, offering rest instead of more pressure. He describes Himself as gentle and humble, which makes coming to Him safe. Rest here isn't just physical; it reaches the soul.
+Write what the passage says here.
 Application:
-I will bring my weariness to Jesus instead of trying to push through on my own strength.
+Write how you will apply it here.
 Prayer:
-Jesus, I'm tired in ways I can't fix myself. Thank you for being gentle. I'm coming to you for rest. Amen
+Write your prayer here.
+
+September 2
+Scripture:
+Write the Bible passage here.
+Book 1:1-3 (NIV)
+Observation:
+Write what the passage says here.
+Application:
+Write how you will apply it here.
+Prayer:
+Write your prayer here.
+Notes:
+Optional — write any extra notes here, or delete this section.
 `;
 
 const SECTIONS = ["scripture", "verse", "observation", "application", "prayer", "notes"] as const;
