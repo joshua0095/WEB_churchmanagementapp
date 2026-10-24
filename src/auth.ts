@@ -53,6 +53,7 @@ export function clearToken(): void {
   localStorage.removeItem(LEGACY_IS_REGISTRAR_KEY);
   localStorage.removeItem(MODULE_ACCESS_KEY);
   localStorage.removeItem("authLastRefresh"); // refreshSession's throttle stamp (api.ts)
+  localStorage.removeItem("authMe"); // the cached name/photo (meCache.ts)
 }
 
 export function isAuthenticated(): boolean {

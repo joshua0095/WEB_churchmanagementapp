@@ -26,6 +26,7 @@ import ThemeNotice, { themeNoticeFor } from "../components/announcements/ThemeNo
 import { InitialAvatar } from "../components/PeopleShared";
 import { AnnouncementCarousel, AppShell, ProfileMenu, Skeleton } from "../components/ui";
 import { CakeIcon, ChurchIcon, NavAnnouncementsIcon, NavDevotionIcon } from "../components/ui/shellIcons";
+import { getCachedMe } from "../meCache";
 import { formatThemeMonth, manilaMonth, themeAltText } from "../monthlyTheme";
 import { getBibleVersionId } from "../preferences";
 import sanctuaryPhoto from "../assets/login-bg.jpg";
@@ -191,7 +192,8 @@ function Home() {
   const canAttendance = isAdmin() || canAccessModule("Attendance");
   const canAnnouncements = isAdmin() || canAccessModule("Announcements");
 
-  const [firstName, setFirstName] = useState("");
+  // The device's cached person fills the greeting straight away while the server wakes up.
+  const [firstName, setFirstName] = useState(() => getCachedMe()?.firstName ?? "");
   const [userKey, setUserKey] = useState<string | null>(null);
   const [blessing] = useState(randomBlessing);
   const [verse, setVerse] = useState<VerseOfTheDay | null>(null);
@@ -204,7 +206,9 @@ function Home() {
   // null = still loading; "unknown" = the fetch failed, so the card just offers the Devotion page.
   const [wroteToday, setWroteToday] = useState<boolean | "unknown" | null>(null);
   const [gathering, setGathering] = useState<string | null>(null);
+  const [gatheringLoading, setGatheringLoading] = useState(canAttendance);
   const [theme, setTheme] = useState<MonthlyThemeInfo | null>(null);
+  const [themeLoading, setThemeLoading] = useState(true);
   // Only fetched for people who manage announcements — drives the "theme isn't set" notice.
   const [themeOverview, setThemeOverview] = useState<MonthlyThemeOverview | null>(null);
   const [themeModalMonth, setThemeModalMonth] = useState<string | null>(null);
@@ -249,7 +253,8 @@ function Home() {
   const loadTheme = useCallback(() => {
     getCurrentMonthlyTheme()
       .then(setTheme)
-      .catch(() => setTheme(null)); // no poster card is the same as no theme — announcements take the row
+      .catch(() => setTheme(null)) // no poster card is the same as no theme — announcements take the row
+      .finally(() => setThemeLoading(false));
     if (canAnnouncements) {
       getMonthlyThemes()
         .then(setThemeOverview)
@@ -277,7 +282,8 @@ function Home() {
     if (!canAttendance) return;
     getAttendanceEvents()
       .then((events) => setGathering(nextGathering(events)))
-      .catch(() => {});
+      .catch(() => {})
+      .finally(() => setGatheringLoading(false));
   }, [canAttendance]);
 
   const weekStart = startOfWeek(new Date());
@@ -315,9 +321,9 @@ function Home() {
             </h1>
             {verseLoading ? (
               <div className="home-verse" aria-hidden="true">
-                <Skeleton className="mb-2 h-5 w-full opacity-20" />
-                <Skeleton className="mb-3 h-5 w-4/5 opacity-20" />
-                <Skeleton className="h-3.5 w-40 opacity-20" />
+                <Skeleton tone="navy" className="mb-2 h-5 w-full" />
+                <Skeleton tone="navy" className="mb-3 h-5 w-4/5" />
+                <Skeleton tone="navy" className="h-3.5 w-40" />
               </div>
             ) : verse ? (
               <figure className="home-verse">
@@ -337,7 +343,7 @@ function Home() {
         {birthdays.length > 0 && <BirthdayCard people={birthdays} viewerId={userKey ? Number(userKey) : null} />}
 
         {/* 2. Announcements + theme of the month */}
-        <div className={theme ? "home-row" : "home-row home-row--single"}>
+        <div className={theme || themeLoading ? "home-row" : "home-row home-row--single"}>
           {announcementsLoading ? (
             <div className="home-card home-announce" aria-hidden="true">
               <Skeleton className="mb-5 h-3 w-40" />
@@ -355,7 +361,15 @@ function Home() {
             </section>
           )}
 
-          {theme && (
+          {themeLoading ? (
+            <div className="home-theme" aria-hidden="true">
+              <Skeleton className="aspect-video w-full rounded-none" />
+              <div className="home-theme-caption">
+                <Skeleton className="h-3 w-36" />
+                <Skeleton className="h-3 w-20" />
+              </div>
+            </div>
+          ) : theme && (
             <ThemeCard
               monthLabel={formatThemeMonth(theme.month)}
               imageSrc={monthlyThemeImageSrc(theme)}
@@ -396,7 +410,9 @@ function Home() {
               <WalkCard
                 icon={<ChurchIcon />}
                 title="Gather with the church"
-                status={gathering ?? "Take attendance for today's service"}
+                status={
+                  gatheringLoading ? <Skeleton className="mt-1 h-3.5 w-48" /> : (gathering ?? "Take attendance for today's service")
+                }
                 action={{ label: "Take attendance", to: "/attendance" }}
               />
             )}

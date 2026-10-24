@@ -4,6 +4,7 @@ import { canAccessModule, clearToken, getRoleLabel } from "../../auth";
 import { useMe, setCachedMe } from "../../meCache";
 import { getSidebarCollapsed, setSidebarCollapsed } from "../../preferences";
 import { InitialAvatar } from "../PeopleShared";
+import WakeBanner from "../wake/WakeBanner";
 import {
   CollapseSidebarIcon,
   MoreNavIcon,
@@ -353,6 +354,8 @@ function AppShell({ children, headerRight, pageClassName, mobileFocus }: AppShel
             {headerRight}
           </header>
         )}
+
+        <WakeBanner />
 
         <div className={["page", pageClassName].filter(Boolean).join(" ")}>{children}</div>
 

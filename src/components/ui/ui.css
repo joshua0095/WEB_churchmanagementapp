@@ -2668,40 +2668,6 @@
 /* ---------- Session loading screen ----------
    Shown by ProtectedRoute while a returning, still-signed-in person's session is refreshed
    on launch. Navy like the login page, so going from one to the other doesn't flash. */
-.session-loading {
-  min-height: 100vh;
-  min-height: 100dvh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding: 24px 16px calc(24px + env(safe-area-inset-bottom));
-  background: var(--color-navy);
-  color: var(--color-text-on-navy);
-  text-align: center;
-}
-.session-loading-logo {
-  height: 56px;
-  width: auto;
-  margin-bottom: 8px;
-}
-.session-loading-text {
-  margin: 0;
-  font-size: 15px;
-  color: var(--color-navy-dim);
-}
-.session-loading-note {
-  max-width: 320px;
-  margin: 0;
-  padding: 12px 14px;
-  border-radius: 10px;
-  font-size: 14px;
-  line-height: 1.4;
-  background: color-mix(in srgb, var(--color-text-on-navy) 8%, transparent);
-  color: var(--color-navy-dim);
-}
-
 /* ---------- Login page ----------
    Mobile-first: a photo header with the form in a cream sheet overlapping it.
    ≥1024px: full-bleed photo with the form in a floating card on the right.
@@ -3213,6 +3179,12 @@
 }
 
 /* ---------- Settings page ---------- */
+/* The tables below switch to their stacked/compact layouts from the panel's own width, not
+   the viewport's — on a mid-size desktop the app sidebar + settings tab list leave the panel
+   only ~550px, too narrow for the fixed column tracks (Event collapsed to one letter wide). */
+.settings-panel {
+  container: settings-panel / inline-size;
+}
 .settings-layout {
   display: grid;
   grid-template-columns: 240px minmax(0, 1fr);
@@ -3687,7 +3659,9 @@
   transform: rotate(-90deg);
 }
 
-@media (max-width: 1023px) {
+/* 800px ≈ the narrowest panel where every table's fixed tracks (Access: 4 × 132px) still
+   leave a readable name column. */
+@container settings-panel (max-width: 799px) {
   .setting-row {
     flex-direction: column;
     align-items: stretch;

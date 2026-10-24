@@ -116,7 +116,7 @@ function Profile() {
       });
       setMe(updated);
       setForm(formFromUser(updated));
-      setCachedMe({ name: updated.name, photoDataUrl: updated.photoDataUrl });
+      setCachedMe({ name: updated.name, firstName: updated.firstName, photoDataUrl: updated.photoDataUrl });
       successToast("Profile updated");
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "Failed to update your profile");

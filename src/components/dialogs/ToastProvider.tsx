@@ -22,7 +22,9 @@ interface ToastItem extends ToastOptions {
 }
 
 interface ToastContextValue {
-  show: (options: ToastOptions) => void;
+  /** Returns the toast's id, for dismiss(). */
+  show: (options: ToastOptions) => string;
+  dismiss: (id: string) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -99,10 +101,11 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       const next = [...current, { ...options, id, leaving: false }];
       return next.length > MAX_VISIBLE ? next.slice(next.length - MAX_VISIBLE) : next;
     });
+    return id;
   }, []);
 
   return (
-    <ToastContext.Provider value={{ show }}>
+    <ToastContext.Provider value={{ show, dismiss }}>
       {children}
       {createPortal(
         <div className="toast-stack" aria-live="polite">

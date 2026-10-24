@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { getMe } from "./api";
+import { getToken } from "./auth";
 
-export type Me = { name: string; photoDataUrl: string | null };
+export type Me = { name: string; firstName?: string; photoDataUrl: string | null };
 
 // The app shell renders several places that all need the signed-in person's name/photo at
 // once (sidebar user card, mobile topbar avatar, desktop account button) — a module-level
@@ -9,7 +10,33 @@ export type Me = { name: string; photoDataUrl: string | null };
 // the rest just subscribe to whatever it resolves to. Profile.tsx calls setCachedMe right
 // after a successful self-save so every mounted consumer picks up a changed name/photo
 // immediately, instead of waiting for a fresh page load.
-let cachedMe: Me | null = null;
+//
+// The person is also kept in localStorage: on launch the shell can show their name while a
+// sleeping server wakes up (see serverStatus.ts). It's still re-fetched once per page load.
+const STORAGE_KEY = "authMe"; // also cleared by clearToken() in auth.ts
+
+function readStored(): Me | null {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw || !getToken()) return null;
+    const parsed = JSON.parse(raw) as Me;
+    return typeof parsed?.name === "string" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStored(me: Me | null) {
+  try {
+    if (me) localStorage.setItem(STORAGE_KEY, JSON.stringify(me));
+    else localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // storage full or blocked — the in-memory cache still works for this visit
+  }
+}
+
+let cachedMe: Me | null = readStored();
+let fetchedThisLoad = false;
 let inFlight: Promise<void> | null = null;
 let retryTimer: ReturnType<typeof setTimeout> | null = null;
 let failedAttempts = 0;
@@ -17,10 +44,21 @@ const listeners = new Set<(me: Me | null) => void>();
 
 const MAX_RETRIES = 3;
 
+/** True when a previous visit left this person cached on the device. */
+export function hasCachedMe(): boolean {
+  return readStored() !== null;
+}
+
+export function getCachedMe(): Me | null {
+  return cachedMe;
+}
+
 /** Pass null on logout: it also forgets that a fetch happened, so the next sign-in in the
  * same tab (no page reload) fetches the new person instead of waiting on the old cache. */
 export function setCachedMe(me: Me | null) {
   cachedMe = me;
+  writeStored(me);
+  fetchedThisLoad = me !== null;
   if (me === null) {
     inFlight = null;
     failedAttempts = 0;
@@ -31,12 +69,13 @@ export function setCachedMe(me: Me | null) {
 }
 
 function ensureFetched() {
-  if (cachedMe || inFlight || retryTimer) return;
+  if (fetchedThisLoad || inFlight || retryTimer) return;
   const request = getMe()
     .then((me) => {
       if (inFlight !== request) return; // logged out (or refetched) while this was pending
+      inFlight = null;
       failedAttempts = 0;
-      setCachedMe(me);
+      setCachedMe({ name: me.name, firstName: me.firstName, photoDataUrl: me.photoDataUrl });
     })
     .catch(() => {
       if (inFlight !== request) return;

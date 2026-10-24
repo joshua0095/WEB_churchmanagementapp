@@ -1,4 +1,5 @@
 import { clearToken, getToken, setIsAdmin, setIsMis, setModuleAccess, setToken } from "./auth";
+import { trackedFetch } from "./serverStatus";
 
 export interface User {
   id: string | number;
@@ -62,7 +63,7 @@ async function apiFetch(path: string, options: RequestInit = {}): Promise<Respon
     headers.set("Authorization", `Bearer ${token}`);
   }
 
-  const res = await fetch(`${API_URL}${path}`, { ...options, headers });
+  const res = await trackedFetch(`${API_URL}${path}`, { ...options, headers });
 
   if (res.status === 401) {
     clearToken();
@@ -253,7 +254,7 @@ export function versionShortLabel(version: BibleVersion): string {
 
 export async function getVerseOfTheDay(bibleId?: string | null): Promise<VerseOfTheDay> {
   const query = bibleId ? `?bibleId=${encodeURIComponent(bibleId)}` : "";
-  const res = await fetch(`${API_URL}/api/verse-of-the-day${query}`);
+  const res = await trackedFetch(`${API_URL}/api/verse-of-the-day${query}`);
   if (!res.ok) {
     throw new Error(`Failed to fetch verse of the day (${res.status})`);
   }
@@ -261,7 +262,7 @@ export async function getVerseOfTheDay(bibleId?: string | null): Promise<VerseOf
 }
 
 export async function getBibleVersions(): Promise<BibleVersion[]> {
-  const res = await fetch(`${API_URL}/api/verse-of-the-day/versions`);
+  const res = await trackedFetch(`${API_URL}/api/verse-of-the-day/versions`);
   if (!res.ok) {
     throw new Error(`Failed to fetch Bible versions (${res.status})`);
   }
@@ -278,7 +279,7 @@ export async function getBiblePassage(
   const params = new URLSearchParams({ book, chapter: String(chapter), verse: String(verse) });
   if (verseEnd && verseEnd !== verse) params.set("verseEnd", String(verseEnd));
   if (bibleId) params.set("bibleId", bibleId);
-  const res = await fetch(`${API_URL}/api/verse-of-the-day/passage?${params}`);
+  const res = await trackedFetch(`${API_URL}/api/verse-of-the-day/passage?${params}`);
   if (!res.ok) {
     throw new Error((await res.text()) || `Failed to fetch that passage (${res.status})`);
   }
@@ -292,7 +293,7 @@ export async function getChapterVerseCount(
 ): Promise<number> {
   const params = new URLSearchParams({ book, chapter: String(chapter) });
   if (bibleId) params.set("bibleId", bibleId);
-  const res = await fetch(`${API_URL}/api/verse-of-the-day/chapter-length?${params}`);
+  const res = await trackedFetch(`${API_URL}/api/verse-of-the-day/chapter-length?${params}`);
   if (!res.ok) {
     throw new Error((await res.text()) || `Failed to fetch that chapter (${res.status})`);
   }

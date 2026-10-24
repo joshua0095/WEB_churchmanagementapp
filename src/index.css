@@ -18,6 +18,7 @@
 @import "./theme.css";
 @import "./components/ui/ui.css";
 @import "./components/dialogs/dialogs.css";
+@import "./components/wake/wake.css";
 @import "./components/attendance/attendance.css";
 @import "./components/announcements/announcements.css";
 @import "./components/people/workers.css";
